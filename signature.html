@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Mission Lane Email Signature Generator&trade;</title>
+    <link href="https://fonts.googleapis.com/css?family=Raleway:800|Roboto+Mono|Roboto:400,400i,700|Caveat" rel="stylesheet">
+    <link rel="stylesheet" href="https://assets-mono-cf.prod-us-east-1.aws.missionlane.com/public/assets/css/dist/signpost-b68051e4.css">
+  </head>
+  <body class="roboto lh-copy">
+    <div class="mw8 center pt6">
+      <h1 class="f2 fw8 mv4 lh-title">Mission Lane Email Signature Generator&trade;</h1>
+      <div class="dg gg6 cols-2 pt4">
+        <div class="col-span-1">
+          <h3 class="f4 mv4 lh-title"><span class="nl4 mr1 pink monospace fw7">1</span> Enter your information here</h3>
+          <form class="mt5 mh0 pa0" method="post">
+            <div class="mt0 mb4">
+              <label class="roboto f6 db fw7" for="fullName">Full Name</label>
+              <input class="w5" type="text" name="fullName" id="fullName" placeholder="Vinz Clortho" />
+            </div>
+            <div class="mt0 mb4">
+              <label class="roboto f6 db fw7" for="secondLine">2nd Line (Job title)</label>
+              <input class="w5" type="text" name="secondLine" id="secondLine" placeholder="Keymaster of Gozer" />
+            </div>
+
+            <div class="mt0 mb4">
+              <label class="roboto f6 db fw7" for="fullName">3nd Line (Phone Number)</label>
+              <input class="w5" type="text" name="thirdLine" id="thirdLine" placeholder="555•321•1212" />
+            </div>
+          </form>
+        </div>
+
+        <div class="col-span-1">
+          <h3 class="f4 mv4 lh-title"><span class="nl4 mr1 pink monospace fw7">2</span> Then copy everything in this box:</h3>
+
+          <div class="pa5" style="border: 1px solid #ebecf1;">
+            <div style="font-family: 'Raleway', Helvetica, Arial, sans-serif; color: #0d0b23; font-size:20px; line-height: 24px; font-weight: 800" data-source="fullName">Vinz Clortho</div>
+            <div style="font-family: 'Roboto', Helvetica, Arial, sans-serif; color: #5d6070; font-size:14px; line-height: 20px;" data-source="secondLine">Keymaster of Gozer</div>
+            <div style="font-family: 'Roboto', Helvetica, Arial, sans-serif; color: #5d6070; font-size:14px; line-height: 20px;"><span data-source="thirdLine">555•321•1212</span> | www.missionlane.com</div>
+            <a href="https://www.missionlane.com">
+              <img style="display: inline-block; margin-top:8px; margin-bottom:16px;" src="https://assets-mono-cf.prod-us-east-1.aws.missionlane.com/public/assets/images/signpost/logos/png/mission-lane-logo.png" alt="Mission Lane Logo" width="93" />
+            </a>
+          </div>
+          <h3 class="f4 mv4 lh-title pt5"><span class="nl4 mr1 pink monospace fw7">3</span> And paste that into the signature field in your email settings</h3>
+          <p class="ink-70 f6 lh-copy">Probably have some instructions for popular email clients soon&hellip;</p>
+        </div>
+      </div>
+    </div>
+  </body>
+
+  <script type="text/javascript">
+    var fields = document.getElementsByTagName('input');
+    for(let field of fields) {
+      field.addEventListener('keyup', e => {
+        var fieldValue = field.value;
+        if(fieldValue === '') {
+          fieldValue = field.placeholder;
+        }
+        var fieldName = field.name;
+        var elSelector = '[data-source="' + fieldName + '"]';
+        console.log(elSelector);
+        var boundEl = document.querySelector(elSelector);
+        boundEl.innerText = fieldValue;
+      });
+    }
+  </script>
+</html>
