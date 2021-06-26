@@ -13,16 +13,25 @@
         <div class="col-span-1">
           <h3 class="f4 mv4 lh-title"><span class="nl4 mr1 pink monospace fw7">1</span> Enter your information here</h3>
           <form class="mt5 mh0 pa0" method="post">
-            <div class="mt0 mb4">
+            <div class="mt0 mb5">
               <label class="roboto f6 db fw7" for="fullName">Full Name</label>
               <input class="w-100" type="text" name="fullName" id="fullName" placeholder="Vinz Clortho" />
             </div>
-            <div class="mt0 mb4">
+            <div class="mt0 mb5">
+              <label class="roboto f6 db fw7" for="pronouns">Pronouns (optional)</label>
+              <label class="roboto lh-copy ink-70 mv1 db" for="no_pronouns">
+                <input class="" type="checkbox" id="no_pronouns" name="no_pronouns" value="" />
+                I'd prefer not to state
+              </label>
+              <input class="w-100" type="text" name="pronouns" id="pronouns" placeholder="(They/Theirs)" />
+              <p class="f7 lh-copy ink-70 mv2">Separate by typing a "/" between pronouns</p>
+            </div>
+            <div class="mt0 mb5">
               <label class="roboto f6 db fw7" for="secondLine">2nd Line (Job Title)</label>
               <input class="w-100" type="text" name="secondLine" id="secondLine" placeholder="Keymaster of Gozer" />
             </div>
 
-            <div class="mt0 mb4">
+            <div class="mt0 mb5">
               <label class="roboto f6 db fw7" for="fullName">3nd Line (Phone Number)</label>
               <input class="w-100" type="text" name="thirdLine" id="thirdLine" placeholder="555•321•1212" />
               <p class="f7 lh-copy ink-70 mv2">If you're on a mac, type the "•" character with <em class="italic">option-asterisk</em>.</p>
@@ -34,7 +43,10 @@
           <h3 class="f4 mv4 lh-title"><span class="nl4 mr1 pink monospace fw7">2</span> Then copy everything in this box:</h3>
 
           <div class="pa5 ba b--ink-20">
-            <div style="font-family: 'Raleway', Helvetica, Arial, sans-serif; color: #0d0b23; font-size:20px; line-height: 24px; font-weight: 800;" data-source="fullName">Vinz Clortho</div>
+            <div style="font-family: 'Raleway', Helvetica, Arial, sans-serif; color: #0d0b23; font-size:20px; line-height: 24px; font-weight: 800;">
+              <span data-source="fullName">Vinz Clortho</span>
+              <span style="font-family: 'Roboto', Helvetica, Arial, sans-serif; color: #5d6070; font-size:14px; line-height: 20px; font-weight: 500;" data-source="pronouns" id="pronoun_display">(They/Theirs)</span>
+            </div>
             <div style="font-family: 'Roboto', Helvetica, Arial, sans-serif; color: #5d6070; font-size:14px; line-height: 20px;" data-source="secondLine">Keymaster of Gozer</div>
             <div style="font-family: 'Roboto', Helvetica, Arial, sans-serif; color: #5d6070; font-size:14px; line-height: 20px;"><span data-source="thirdLine">555•321•1212</span> | <a style="color:#4661E1; text-decoration:none;" href="https://www.missionlane.com">www.missionlane.com</a></div>
             <a href="https://www.missionlane.com">
@@ -55,17 +67,45 @@
 
   <script type="text/javascript">
     var fields = document.getElementsByTagName('input');
+    var pronoun_display = document.getElementById('pronoun_display');
+    var pronoun_toggle = document.getElementById('no_pronouns');
+
+    var togglePronouns = function() {
+      if(pronoun_toggle.checked){
+        hidePronouns()
+      } else {
+        showPronouns();
+      }
+    }
+    var hidePronouns = function() {
+      pronoun_display.style.display = "none";
+    }
+
+    var showPronouns = function() {
+      pronoun_display.style.display = "inline";
+    }
+
+    no_pronouns.addEventListener('change', e => {
+      togglePronouns();
+    });
+
     for(let field of fields) {
       field.addEventListener('keyup', e => {
         var fieldValue = field.value;
+        var fieldName = field.name;
+
         if(fieldValue === '') {
           fieldValue = field.placeholder;
         }
-        var fieldName = field.name;
+
+        if(fieldName === 'pronouns') {
+          fieldValue = `(${fieldValue.replace('(', '').replace(')', '')})`;
+        }
+
         var elSelector = '[data-source="' + fieldName + '"]';
-        console.log(elSelector);
         var boundEl = document.querySelector(elSelector);
         boundEl.innerText = fieldValue;
+        togglePronouns();
       });
     }
   </script>
