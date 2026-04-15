@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Venn Diagram Maker</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: linear-gradient(135deg, #0f172a 0%, #1a2540 50%, #0f172a 100%);
+  min-height: 100vh;
+  color: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 20px 40px;
+}
+
+header { text-align: center; margin-bottom: 24px; }
+
+h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, #60a5fa, #a78bfa, #34d399);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 6px;
+  letter-spacing: -0.5px;
+}
+
+.subtitle { color: #475569; font-size: 0.88rem; }
+
+/* ── Venn wrapper ─────────────────────────────── */
+#venn-wrapper {
+  position: relative;
+  width: min(720px, 100vw - 40px);
+  user-select: none;
+}
+
+#venn-svg { width: 100%; height: auto; display: block; }
+
+/* ── Editable circle labels ───────────────────── */
+.lbl-wrap {
+  position: absolute;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+}
+.lbl-wrap.lbl-a { top: 18px;  left: 0;    width: 200px; }
+.lbl-wrap.lbl-b { top: 18px;  right: 0;   width: 200px; }
+.lbl-wrap.lbl-c { bottom: 22px; left: 50%; transform: translateX(-50%); width: 200px; }
+
+.circle-label {
+  pointer-events: auto;
+  display: inline-block;
+  text-align: center;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: text;
+  outline: none;
+  min-width: 90px;
+  border: 1.5px solid transparent;
+  transition: border-color 0.2s, background 0.2s;
+  white-space: nowrap;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(6px);
+}
+.circle-label.la { color: #93c5fd; border-color: rgba(96,165,250,0.35); }
+.circle-label.lb { color: #fca5a5; border-color: rgba(248,113,113,0.35); }
+.circle-label.lc { color: #86efac; border-color: rgba(74,222,128,0.35); }
+.circle-label:focus { border-color: rgba(255,255,255,0.45); background: rgba(30,41,59,0.95); }
+
+/* ── Modal backdrop ───────────────────────────── */
+#modal-bg {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  backdrop-filter: blur(4px);
+  z-index: 500;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+#modal-bg.show { display: flex; }
+
+/* ── Modal box ────────────────────────────────── */
+#modal {
+  background: #1e293b;
+  border: 1px solid #2d3f55;
+  border-radius: 20px;
+  padding: 26px;
+  width: 100%;
+  max-width: 680px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 30px 70px rgba(0,0,0,0.55);
+}
+
+.modal-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+
+#modal-title {
+  font-size: 1rem; font-weight: 600; color: #93c5fd;
+  flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+#modal-close {
+  background: rgba(255,255,255,0.08); border: none; color: #94a3b8;
+  width: 34px; height: 34px; border-radius: 10px; font-size: 1.1rem;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: background 0.15s, color 0.15s;
+}
+#modal-close:hover { background: rgba(255,255,255,0.16); color: #e2e8f0; }
+
+/* ── Search bar ───────────────────────────────── */
+.search-bar { display: flex; gap: 8px; }
+
+#search-input {
+  flex: 1; background: #0f172a; border: 1.5px solid #2d3f55; border-radius: 11px;
+  color: #e2e8f0; padding: 10px 14px; font-size: 0.93rem; transition: border-color 0.2s;
+}
+#search-input:focus { outline: none; border-color: #3b82f6; }
+#search-input::placeholder { color: #3d5166; }
+
+#search-btn {
+  background: #3b82f6; color: #fff; border: none; border-radius: 11px;
+  padding: 10px 22px; font-size: 0.93rem; font-weight: 600; cursor: pointer;
+  transition: background 0.15s; white-space: nowrap;
+}
+#search-btn:hover  { background: #2563eb; }
+#search-btn:active { background: #1d4ed8; }
+
+/* ── Results area ─────────────────────────────── */
+#results-area { flex: 1; overflow-y: auto; min-height: 220px; border-radius: 10px; }
+
+#status-msg {
+  color: #3d5166; text-align: center; padding: 48px 20px;
+  font-size: 0.9rem; line-height: 1.7;
+}
+
+#img-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.thumb {
+  aspect-ratio: 1; width: 100%; object-fit: cover; border-radius: 10px;
+  cursor: pointer; border: 2px solid transparent; background: #0f172a; display: block;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.thumb:hover {
+  border-color: #3b82f6; transform: scale(1.04);
+  box-shadow: 0 4px 20px rgba(59,130,246,0.35);
+}
+
+/* ── Spinner ──────────────────────────────────── */
+.spinner {
+  width: 28px; height: 28px;
+  border: 3px solid rgba(59,130,246,0.25); border-top-color: #3b82f6;
+  border-radius: 50%; animation: spin 0.75s linear infinite;
+  margin: 44px auto; display: block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Paste URL row ────────────────────────────── */
+.paste-row {
+  display: flex; gap: 8px; align-items: center;
+  padding-top: 10px; border-top: 1px solid #1e2d40;
+}
+.paste-label { color: #3d5166; font-size: 0.8rem; white-space: nowrap; }
+
+#url-input {
+  flex: 1; background: #0f172a; border: 1.5px solid #2d3f55; border-radius: 9px;
+  color: #e2e8f0; padding: 7px 11px; font-size: 0.82rem;
+}
+#url-input:focus { outline: none; border-color: #3b82f6; }
+#url-input::placeholder { color: #3d5166; }
+
+#url-btn {
+  background: #2d3f55; color: #e2e8f0; border: none; border-radius: 9px;
+  padding: 7px 16px; font-size: 0.82rem; cursor: pointer;
+  transition: background 0.15s; white-space: nowrap;
+}
+#url-btn:hover { background: #3d5166; }
+
+/* ── Toolbar ──────────────────────────────────── */
+.toolbar { margin-top: 18px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+.tool-btn {
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  color: #94a3b8; border-radius: 10px; padding: 8px 18px; font-size: 0.82rem;
+  cursor: pointer; transition: background 0.15s, color 0.15s;
+}
+.tool-btn:hover { background: rgba(255,255,255,0.1); color: #e2e8f0; }
+
+.source-note { margin-top: 16px; color: #2d3f55; font-size: 0.75rem; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Venn Diagram Maker</h1>
+  <p class="subtitle">Click any section to search &amp; add an image &bull; Click circle names to rename them</p>
+</header>
+
+<div id="venn-wrapper">
+  <div class="lbl-wrap lbl-a">
+    <span class="circle-label la" id="lbl-a" contenteditable="true" spellcheck="false">Circle A</span>
+  </div>
+  <div class="lbl-wrap lbl-b">
+    <span class="circle-label lb" id="lbl-b" contenteditable="true" spellcheck="false">Circle B</span>
+  </div>
+  <div class="lbl-wrap lbl-c">
+    <span class="circle-label lc" id="lbl-c" contenteditable="true" spellcheck="false">Circle C</span>
+  </div>
+
+  <svg id="venn-svg" viewBox="0 0 720 580" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <!--
+        CIRCLE POSITIONS:
+          A (blue/left):   cx=270 cy=228 r=162
+          B (red/right):   cx=450 cy=228 r=162
+          C (green/btm):   cx=360 cy=368 r=162
+
+        MASKS for single-circle exclusive regions:
+          Strategy: white rect = show all, white circle = include, black circle = exclude.
+          Drawing order matters — later shapes paint over earlier ones.
+      -->
+
+      <!-- A only: show A, punch out B and C -->
+      <mask id="msk-a">
+        <rect width="720" height="580" fill="black"/>
+        <circle cx="270" cy="228" r="162" fill="white"/>
+        <circle cx="450" cy="228" r="162" fill="black"/>
+        <circle cx="360" cy="368" r="162" fill="black"/>
+      </mask>
+
+      <!-- B only: show B, punch out A and C -->
+      <mask id="msk-b">
+        <rect width="720" height="580" fill="black"/>
+        <circle cx="450" cy="228" r="162" fill="white"/>
+        <circle cx="270" cy="228" r="162" fill="black"/>
+        <circle cx="360" cy="368" r="162" fill="black"/>
+      </mask>
+
+      <!-- C only: show C, punch out A and B -->
+      <mask id="msk-c">
+        <rect width="720" height="580" fill="black"/>
+        <circle cx="360" cy="368" r="162" fill="white"/>
+        <circle cx="270" cy="228" r="162" fill="black"/>
+        <circle cx="450" cy="228" r="162" fill="black"/>
+      </mask>
+
+      <!--
+        CLIP PATHS for pairwise/triple intersections:
+          Chained clip-path on a <clipPath> element restricts it to the parent clip zone,
+          giving us boolean intersection without any external library.
+      -->
+      <clipPath id="cp-a"><circle cx="270" cy="228" r="162"/></clipPath>
+      <clipPath id="cp-b"><circle cx="450" cy="228" r="162"/></clipPath>
+
+      <!-- A ∩ B -->
+      <clipPath id="cp-ab" clip-path="url(#cp-a)">
+        <circle cx="450" cy="228" r="162"/>
+      </clipPath>
+      <!-- A ∩ C -->
+      <clipPath id="cp-ac" clip-path="url(#cp-a)">
+        <circle cx="360" cy="368" r="162"/>
+      </clipPath>
+      <!-- B ∩ C -->
+      <clipPath id="cp-bc" clip-path="url(#cp-b)">
+        <circle cx="360" cy="368" r="162"/>
+      </clipPath>
+      <!-- A ∩ B ∩ C -->
+      <clipPath id="cp-abc" clip-path="url(#cp-ab)">
+        <circle cx="360" cy="368" r="162"/>
+      </clipPath>
+
+      <!-- Subtraction masks: show everything EXCEPT one circle -->
+      <mask id="msk-not-a">
+        <rect width="720" height="580" fill="white"/>
+        <circle cx="270" cy="228" r="162" fill="black"/>
+      </mask>
+      <mask id="msk-not-b">
+        <rect width="720" height="580" fill="white"/>
+        <circle cx="450" cy="228" r="162" fill="black"/>
+      </mask>
+      <mask id="msk-not-c">
+        <rect width="720" height="580" fill="white"/>
+        <circle cx="360" cy="368" r="162" fill="black"/>
+      </mask>
+    </defs>
+
+    <!-- Glow halos -->
+    <circle cx="270" cy="228" r="168" fill="rgba(59,130,246,0.06)"/>
+    <circle cx="450" cy="228" r="168" fill="rgba(239,68,68,0.06)"/>
+    <circle cx="360" cy="368" r="168" fill="rgba(34,197,94,0.06)"/>
+
+    <!-- Main circles (fill reduced so region images show clearly) -->
+    <circle cx="270" cy="228" r="162" fill="rgba(59,130,246,0.12)" stroke="#3b82f6" stroke-width="2.2"/>
+    <circle cx="450" cy="228" r="162" fill="rgba(239,68,68,0.12)"  stroke="#ef4444" stroke-width="2.2"/>
+    <circle cx="360" cy="368" r="162" fill="rgba(34,197,94,0.12)"  stroke="#22c55e" stroke-width="2.2"/>
+
+    <!-- Region images (filled, masked to exact zone) — inserted by JS -->
+    <g id="region-imgs"></g>
+
+    <!-- Hover highlight — inserted by JS -->
+    <g id="hover-layer"></g>
+
+    <!-- "+" hints for empty regions — inserted by JS -->
+    <g id="hints" pointer-events="none"></g>
+
+    <!-- Transparent click catcher — must be last (on top) -->
+    <rect id="click-catcher" x="0" y="0" width="720" height="580"
+          fill="transparent" style="cursor:default"/>
+  </svg>
+</div>
+
+<div class="toolbar">
+  <button class="tool-btn" id="btn-clear">Clear All Images</button>
+  <button class="tool-btn" id="btn-save">Save as PNG</button>
+</div>
+
+<p class="source-note">Image search powered by Wikimedia Commons &mdash; free &amp; no API key required</p>
+
+<!-- Image search modal -->
+<div id="modal-bg">
+  <div id="modal">
+    <div class="modal-head">
+      <h2 id="modal-title">Add Image</h2>
+      <button id="modal-close" title="Close">✕</button>
+    </div>
+    <div class="search-bar">
+      <input id="search-input" type="text"
+             placeholder="Search images — e.g. ocean, teamwork, technology…"
+             autocomplete="off">
+      <button id="search-btn">Search</button>
+    </div>
+    <div id="results-area">
+      <p id="status-msg">Type a search term above and press Search</p>
+      <div id="img-grid"></div>
+    </div>
+    <div class="paste-row">
+      <span class="paste-label">Or paste any image URL:</span>
+      <input id="url-input" type="text" placeholder="https://example.com/photo.jpg">
+      <button id="url-btn">Use</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Geometry (SVG viewBox: 720 × 580) ────────────────────────────────
+const C = {
+  a: { cx: 270, cy: 228, r: 162 },
+  b: { cx: 450, cy: 228, r: 162 },
+  c: { cx: 360, cy: 368, r: 162 },
+};
+
+// Visual center of each region (for "+" hints and hover feedback)
+const CENTERS = {
+  a:   [182, 196],
+  b:   [538, 196],
+  c:   [360, 474],
+  ab:  [360, 174],
+  ac:  [236, 340],
+  bc:  [484, 340],
+  abc: [360, 288],
+};
+
+// SVG mask/clip attributes per region
+const REGION_ATTRS = {
+  a:   { mask: 'url(#msk-a)' },
+  b:   { mask: 'url(#msk-b)' },
+  c:   { mask: 'url(#msk-c)' },
+  ab:  { 'clip-path': 'url(#cp-ab)',  mask: 'url(#msk-not-c)' },
+  ac:  { 'clip-path': 'url(#cp-ac)',  mask: 'url(#msk-not-b)' },
+  bc:  { 'clip-path': 'url(#cp-bc)',  mask: 'url(#msk-not-a)' },
+  abc: { 'clip-path': 'url(#cp-abc)' },
+};
+
+// ─── State ─────────────────────────────────────────────────────────────
+const images = {};       // regionKey → image URL
+let activeRegion = null;
+let hoveredRegion = null;
+
+// ─── Helpers ───────────────────────────────────────────────────────────
+function lbl(x) {
+  return document.getElementById('lbl-' + x).textContent.trim() || 'Circle ' + x.toUpperCase();
+}
+
+function regionName(key) {
+  const map = {
+    a:   () => `Only "${lbl('a')}"`,
+    b:   () => `Only "${lbl('b')}"`,
+    c:   () => `Only "${lbl('c')}"`,
+    ab:  () => `"${lbl('a')}" ∩ "${lbl('b')}"`,
+    ac:  () => `"${lbl('a')}" ∩ "${lbl('c')}"`,
+    bc:  () => `"${lbl('b')}" ∩ "${lbl('c')}"`,
+    abc: () => `All three overlap`,
+  };
+  return map[key]();
+}
+
+function inCircle(x, y, c) {
+  return (x - c.cx) ** 2 + (y - c.cy) ** 2 <= c.r * c.r;
+}
+
+function hitRegion(x, y) {
+  const a = inCircle(x, y, C.a), b = inCircle(x, y, C.b), c = inCircle(x, y, C.c);
+  if (a && b && c) return 'abc';
+  if (a && b)      return 'ab';
+  if (a && c)      return 'ac';
+  if (b && c)      return 'bc';
+  if (a)           return 'a';
+  if (b)           return 'b';
+  if (c)           return 'c';
+  return null;
+}
+
+const svgNS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(svgNS, tag);
+  Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+  return el;
+}
+
+// ─── Read URL params → set labels ──────────────────────────────────────
+(function applyUrlParams() {
+  const p = new URLSearchParams(window.location.search);
+  ['a', 'b', 'c'].forEach(k => {
+    const v = p.get(k);
+    if (v) document.getElementById('lbl-' + k).textContent = v;
+  });
+})();
+
+// ─── Render region images (full-zone fill via SVG mask/clip) ───────────
+function renderImages() {
+  const g = document.getElementById('region-imgs');
+  g.innerHTML = '';
+
+  for (const [region, url] of Object.entries(images)) {
+    const attrs = {
+      x: '0', y: '0', width: '720', height: '580',
+      href: url,
+      preserveAspectRatio: 'xMidYMid slice',
+      style: 'cursor:pointer',
+      ...REGION_ATTRS[region],
+    };
+    const img = svgEl('image', attrs);
+    // Click is caught by the click-catcher rect on top, so this handler
+    // is a fallback for browsers where the catcher doesn't block image clicks.
+    img.addEventListener('click', e => { e.stopPropagation(); openModal(region); });
+    g.appendChild(img);
+  }
+}
+
+// ─── Render "+" hints in empty regions ─────────────────────────────────
+function renderHints() {
+  const g = document.getElementById('hints');
+  g.innerHTML = '';
+  for (const [region, [x, y]] of Object.entries(CENTERS)) {
+    if (images[region]) continue;
+    const t = svgEl('text', {
+      x, y,
+      'text-anchor': 'middle',
+      'dominant-baseline': 'middle',
+      fill: 'rgba(255,255,255,0.22)',
+      'font-size': '30',
+      'font-weight': '200',
+    });
+    t.textContent = '+';
+    g.appendChild(t);
+  }
+}
+
+// ─── Render hover highlight ────────────────────────────────────────────
+function renderHover() {
+  const g = document.getElementById('hover-layer');
+  g.innerHTML = '';
+  if (!hoveredRegion) return;
+  hoveredRegion.split('').forEach(k => {
+    g.appendChild(svgEl('circle', {
+      cx: C[k].cx, cy: C[k].cy, r: C[k].r,
+      fill: 'rgba(255,255,255,0.08)',
+      stroke: 'rgba(255,255,255,0.15)',
+      'stroke-width': '1',
+    }));
+  });
+}
+
+function renderAll() {
+  renderImages();
+  renderHints();
+}
+
+// ─── SVG pointer events ────────────────────────────────────────────────
+const vennSvg = document.getElementById('venn-svg');
+
+function svgCoords(e) {
+  const r = vennSvg.getBoundingClientRect();
+  return [
+    (e.clientX - r.left) * (720 / r.width),
+    (e.clientY - r.top)  * (580 / r.height),
+  ];
+}
+
+document.getElementById('click-catcher').addEventListener('click', e => {
+  const [x, y] = svgCoords(e);
+  const region = hitRegion(x, y);
+  if (region) openModal(region);
+});
+
+document.getElementById('click-catcher').addEventListener('mousemove', e => {
+  const [x, y] = svgCoords(e);
+  const region = hitRegion(x, y);
+  if (region !== hoveredRegion) {
+    hoveredRegion = region;
+    renderHover();
+    document.getElementById('click-catcher').style.cursor = region ? 'pointer' : 'default';
+  }
+});
+
+document.getElementById('click-catcher').addEventListener('mouseleave', () => {
+  hoveredRegion = null;
+  renderHover();
+});
+
+// ─── Modal ─────────────────────────────────────────────────────────────
+function openModal(region) {
+  activeRegion = region;
+  document.getElementById('modal-title').textContent = `Add Image — ${regionName(region)}`;
+  document.getElementById('search-input').value = '';
+  document.getElementById('url-input').value = '';
+  document.getElementById('img-grid').innerHTML = '';
+  document.getElementById('status-msg').textContent = 'Type a search term above and press Search';
+  document.getElementById('status-msg').style.display = 'block';
+  document.getElementById('modal-bg').classList.add('show');
+  setTimeout(() => document.getElementById('search-input').focus(), 60);
+}
+
+function closeModal() {
+  document.getElementById('modal-bg').classList.remove('show');
+  activeRegion = null;
+}
+
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal-bg').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-bg')) closeModal();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ─── Image search — Wikimedia Commons ──────────────────────────────────
+async function doSearch(query) {
+  const grid   = document.getElementById('img-grid');
+  const status = document.getElementById('status-msg');
+
+  grid.innerHTML = '';
+  status.innerHTML = '<span class="spinner"></span>';
+  status.style.display = 'block';
+
+  const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp']);
+
+  try {
+    const url = 'https://commons.wikimedia.org/w/api.php?' + new URLSearchParams({
+      action:       'query',
+      generator:    'search',
+      gsrsearch:    query,
+      gsrnamespace: '6',
+      gsrlimit:     '24',
+      prop:         'imageinfo',
+      iiprop:       'url|thumburl|mediatype',
+      iiurlwidth:   '280',
+      format:       'json',
+      origin:       '*',
+    });
+
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    status.style.display = 'none';
+
+    if (!data.query || !data.query.pages) {
+      status.textContent = 'No images found. Try different keywords.';
+      status.style.display = 'block';
+      return;
+    }
+
+    let count = 0;
+    Object.values(data.query.pages).forEach(page => {
+      const info = page.imageinfo && page.imageinfo[0];
+      if (!info) return;
+      const ext = (info.url || '').split('.').pop().split('?')[0].toLowerCase();
+      if (!IMAGE_EXTS.has(ext)) return;
+
+      const thumbUrl = info.thumburl || info.url;
+      const fullUrl  = info.url;
+
+      const img = document.createElement('img');
+      img.className = 'thumb';
+      img.src = thumbUrl;
+      img.loading = 'lazy';
+      img.title = (page.title || '').replace('File:', '') || 'Click to use';
+      img.addEventListener('click', () => selectImage(fullUrl));
+      img.addEventListener('error', () => img.remove());
+      grid.appendChild(img);
+      count++;
+    });
+
+    if (count === 0) {
+      status.textContent = 'No images found. Try different keywords.';
+      status.style.display = 'block';
+    }
+  } catch (err) {
+    status.textContent = 'Search failed — check your internet connection.\nYou can also paste an image URL below.';
+    status.style.display = 'block';
+  }
+}
+
+document.getElementById('search-btn').addEventListener('click', () => {
+  const q = document.getElementById('search-input').value.trim();
+  if (q) doSearch(q);
+});
+document.getElementById('search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { const q = e.target.value.trim(); if (q) doSearch(q); }
+});
+
+document.getElementById('url-btn').addEventListener('click', () => {
+  const url = document.getElementById('url-input').value.trim();
+  if (url) selectImage(url);
+});
+document.getElementById('url-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { const url = e.target.value.trim(); if (url) selectImage(url); }
+});
+
+function selectImage(url) {
+  if (!activeRegion) return;
+  images[activeRegion] = url;
+  renderAll();
+  closeModal();
+}
+
+// ─── Toolbar ───────────────────────────────────────────────────────────
+document.getElementById('btn-clear').addEventListener('click', () => {
+  if (!Object.keys(images).length) return;
+  if (confirm('Remove all images from the diagram?')) {
+    Object.keys(images).forEach(k => delete images[k]);
+    renderAll();
+  }
+});
+
+// ─── PNG Export ────────────────────────────────────────────────────────
+// Strategy:
+//   1. Inline all external images as base64 data-URLs (needed for canvas taint)
+//   2. Serialize the SVG with inlined hrefs
+//   3. Draw to canvas at 2× resolution
+//   4. Paint the labels on top using canvas 2D text API
+document.getElementById('btn-save').addEventListener('click', async () => {
+  const SCALE = 2;
+  const VW = 720, VH = 580;
+  const CW = VW * SCALE, CH = VH * SCALE;
+
+  // Step 1 — fetch and inline each region image as a data URL
+  const inlined = {};
+  await Promise.allSettled(
+    Object.entries(images).map(async ([region, url]) => {
+      try {
+        const res  = await fetch(url);
+        const blob = await res.blob();
+        inlined[region] = await new Promise((ok, fail) => {
+          const r = new FileReader();
+          r.onload  = e => ok(e.target.result);
+          r.onerror = fail;
+          r.readAsDataURL(blob);
+        });
+      } catch (_) {
+        inlined[region] = url; // fallback — may fail if CORS blocked
+      }
+    })
+  );
+
+  // Step 2 — build a clone of the SVG with inlined hrefs
+  const svgClone = vennSvg.cloneNode(true);
+  svgClone.querySelectorAll('image').forEach(imgEl => {
+    const region = Object.keys(images).find(k => images[k] === imgEl.getAttribute('href'));
+    if (region && inlined[region]) imgEl.setAttribute('href', inlined[region]);
+    imgEl.removeAttribute('style'); // remove cursor style
+  });
+  // Remove click-catcher so it doesn't block rendering
+  const cc = svgClone.querySelector('#click-catcher');
+  if (cc) cc.remove();
+
+  const svgStr  = new XMLSerializer().serializeToString(svgClone);
+  const svgBlob = new Blob([svgStr], { type: 'image/svg+xml' });
+  const svgUrl  = URL.createObjectURL(svgBlob);
+
+  const svgImg = new Image();
+  svgImg.onload = () => {
+    URL.revokeObjectURL(svgUrl);
+
+    const canvas = document.createElement('canvas');
+    canvas.width  = CW;
+    canvas.height = CH;
+    const ctx = canvas.getContext('2d');
+
+    // Dark background
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // Draw the SVG (circles + masked images)
+    ctx.drawImage(svgImg, 0, 0, CW, CH);
+
+    // Step 4 — paint labels on top
+    drawLabelsOnCanvas(ctx, SCALE);
+
+    // Download
+    const link = document.createElement('a');
+    link.download = 'venn-diagram.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+  svgImg.onerror = () => {
+    URL.revokeObjectURL(svgUrl);
+    alert('Export failed — some images may have cross-origin restrictions.');
+  };
+  svgImg.src = svgUrl;
+});
+
+// Label positions in SVG viewBox coords (matched to CSS lbl-wrap positions)
+const LABEL_EXPORT_POS = {
+  a:   { x: 100, y: 38, align: 'center' },
+  b:   { x: 620, y: 38, align: 'center' },
+  c:   { x: 360, y: 554, align: 'center' },
+};
+const LABEL_COLORS = { a: '#93c5fd', b: '#fca5a5', c: '#86efac' };
+
+function drawLabelsOnCanvas(ctx, scale) {
+  const fontSize = 13 * scale;
+  const padX = 12 * scale, padY = 5 * scale;
+  const radius = 999; // pill shape
+
+  ctx.font = `700 ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+  ctx.textBaseline = 'middle';
+
+  ['a', 'b', 'c'].forEach(k => {
+    const text = lbl(k);
+    const pos  = LABEL_EXPORT_POS[k];
+    const tw   = ctx.measureText(text).width;
+    const bw   = tw + padX * 2;
+    const bh   = fontSize + padY * 2;
+    const bx   = pos.x * scale - bw / 2;
+    const by   = pos.y * scale - bh / 2;
+
+    // Pill background
+    ctx.fillStyle = 'rgba(15,23,42,0.88)';
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, bh, bh / 2);
+    ctx.fill();
+
+    // Pill border
+    ctx.strokeStyle = LABEL_COLORS[k].replace(')', ', 0.4)').replace('rgb', 'rgba').replace('#', '');
+    // simpler: just use globalAlpha
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = LABEL_COLORS[k];
+    ctx.lineWidth = 1.5 * scale;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, bh, bh / 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Text
+    ctx.fillStyle = LABEL_COLORS[k];
+    ctx.fillText(text, pos.x * scale - tw / 2, pos.y * scale);
+  });
+}
+
+// ─── Init ──────────────────────────────────────────────────────────────
+renderAll();
+</script>
+</body>
+</html>

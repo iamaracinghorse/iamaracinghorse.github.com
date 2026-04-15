@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(open /Users/shaneberry/Projects/venn-builder-claude/index.html)"
+    ]
+  }
+}
