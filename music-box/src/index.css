@@ -1,0 +1,197 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: #0f0805;
+}
+
+body {
+  font-family: 'Cinzel', Georgia, serif;
+  color: #f0e6d0;
+  overscroll-behavior: none;
+}
+
+/* Parchment noise texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+  opacity: 0.6;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Fantasy scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #1e120a;
+}
+::-webkit-scrollbar-thumb {
+  background: #4a3520;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #7a5c2e;
+}
+
+/* Gold ornament divider */
+.ornament-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #7a5c2e;
+}
+.ornament-divider::before,
+.ornament-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #7a5c2e, transparent);
+}
+
+/* Tile long-press ripple */
+.tile-press {
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.tile-press:active {
+  transform: scale(0.96);
+}
+
+/* Range input (scrubber / volume) */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: #4a3520;
+  outline: none;
+  cursor: pointer;
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #c9a227;
+  border: 2px solid #0f0805;
+  box-shadow: 0 0 6px rgba(201,162,39,0.5);
+  cursor: pointer;
+}
+input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #c9a227;
+  border: 2px solid #0f0805;
+  cursor: pointer;
+}
+
+/* Equalizer bar animation used on active tiles */
+@keyframes bounce {
+  from { transform: scaleY(0.4); }
+  to   { transform: scaleY(1); }
+}
+
+/* Prevent text selection on long-press tiles */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Tag pill */
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6rem;
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.15);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Fantasy button */
+.btn-fantasy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.4rem;
+  border-radius: 0.5rem;
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #c9a227 0%, #8a6910 50%, #c9a227 100%);
+  background-size: 200% auto;
+  color: #0f0805;
+  border: 1px solid #e8c84e;
+  box-shadow: 0 2px 12px rgba(201,162,39,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+  transition: background-position 0.3s ease, box-shadow 0.2s ease, transform 0.1s ease;
+  cursor: pointer;
+}
+.btn-fantasy:hover {
+  background-position: right center;
+  box-shadow: 0 4px 20px rgba(201,162,39,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.btn-fantasy:active {
+  transform: scale(0.97);
+}
+
+/* Fantasy input */
+.input-fantasy {
+  width: 100%;
+  background: #1e120a;
+  border: 1px solid #4a3520;
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.9rem;
+  font-family: 'Cinzel', serif;
+  font-size: 0.85rem;
+  color: #f0e6d0;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.input-fantasy:focus {
+  border-color: #c9a227;
+  box-shadow: 0 0 0 2px rgba(201,162,39,0.2);
+}
+.input-fantasy::placeholder {
+  color: #6a4c30;
+}
