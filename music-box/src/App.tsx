@@ -187,7 +187,7 @@ export default function App() {
               className="text-7xl mb-6 select-none"
               style={{ filter: 'drop-shadow(0 4px 16px rgba(201,162,39,0.3))' }}
             >
-              🪎
+              🔮
             </div>
             <h2
               className="text-fantasy-gold font-black text-xl mb-3"

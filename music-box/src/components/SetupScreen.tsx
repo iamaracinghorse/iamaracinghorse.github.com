@@ -34,7 +34,7 @@ export function SetupScreen({
     <div className="min-h-full flex flex-col items-center justify-center px-6 py-12">
       {/* Title */}
       <div className="text-center mb-10">
-        <div className="text-5xl mb-4">🪎</div>
+        <div className="text-5xl mb-4">🔮</div>
         <h1
           className="text-2xl sm:text-3xl font-black text-fantasy-gold leading-tight mb-2"
           style={{ fontFamily: "'Cinzel Decorative', serif", textShadow: '0 0 30px rgba(201,162,39,0.4)' }}
