@@ -27,8 +27,12 @@
 #   Repeat a TS on consecutive lines to make that shot linger across more beats.
 #   # comments and blank lines ignored.
 #
+# Overlay a PNG (e.g. a story frame): set OVERLAY=/path/overlay.png. It fades in
+# at OVERLAY_START (default 2s) over OVERLAY_FADE (default 0.2s) and stays; set
+# OVERLAY_END to fade it back out. Transparency is preserved.
+#
 # Env: REEL_SECONDS(75,cap90) CUT_SECONDS(0.7) VIDEO_BITRATE(8M) ANALYZE_FPS(3)
-#      SEED(0) AUDIO AUDIO_START AUDIO_END
+#      SEED(0) AUDIO AUDIO_START AUDIO_END OVERLAY OVERLAY_START OVERLAY_FADE OVERLAY_END
 #
 set -euo pipefail
 
@@ -83,6 +87,7 @@ cmd_prep(){
   SRC="$src" PLAN="$PLAN" PICKS="$PICKS" REEL_SECONDS="$REEL_SECONDS" CUT_SECONDS="$CUT_SECONDS" \
     ANALYZE_FPS="$ANALYZE_FPS" MAX_SECONDS="$MAX_SECONDS" SEED="$SEED" \
     AUDIO="$AUDIO" AUDIO_START="$AUDIO_START" AUDIO_END="$AUDIO_END" \
+    OVERLAY="${OVERLAY:-}" OVERLAY_START="${OVERLAY_START:-2}" OVERLAY_FADE="${OVERLAY_FADE:-0.2}" OVERLAY_END="${OVERLAY_END:-}" \
     python - <<'PY'
 import os, json, subprocess, sys
 import numpy as np
@@ -189,11 +194,16 @@ if os.path.exists(PICKS):
 assigned=[None]*nslots
 used=[]
 if picks:
-    np_=min(len(picks),nslots)
-    for i in range(np_):
-        idx=int(round((i+0.5)*nslots/np_))-1; idx=max(0,min(nslots-1,idx))
-        while assigned[idx] is not None: idx=(idx+1)%nslots
-        assigned[idx]=picks[i]; used.append(int(picks[i][0]))
+    if len(picks)>=nslots:
+        # enough curated moments to fill every slot: use them IN ORDER
+        for i in range(nslots): assigned[i]=picks[i]; used.append(int(picks[i][0]))
+    else:
+        # fewer picks than slots: spread them evenly (order-preserving), auto-fill gaps
+        npk=len(picks)
+        for i in range(npk):
+            idx=(i*nslots)//npk
+            while assigned[idx] is not None: idx=(idx+1)%nslots
+            assigned[idx]=picks[i]; used.append(int(picks[i][0]))
 # auto-fill remaining slots: farthest-point on signatures, weighted by excite
 free=[i for i in range(nslots) if assigned[i] is None]
 if free:
@@ -222,7 +232,16 @@ for (s0,slen),a in zip(slots,assigned):
     cuts.append({"src_start":round(s,3),"dur":round(slen,3),"crop_x":round(cx,3),
                  "excite":round(float(exc[int(min(sec,NS-1))]),3)})
 
-plan={"source":os.path.abspath(SRC),"audio":audio_meta,"tempo":round(tempo,1),
+OVL=os.environ.get("OVERLAY","")
+overlay_meta=None
+if OVL:
+    overlay_meta={"file":os.path.abspath(OVL),
+                  "start":float(os.environ.get("OVERLAY_START") or 2),
+                  "fade":float(os.environ.get("OVERLAY_FADE") or 0.2),
+                  "end":(float(os.environ["OVERLAY_END"]) if os.environ.get("OVERLAY_END") else None)}
+    print(f"  overlay: {OVL} @ {overlay_meta['start']}s, {overlay_meta['fade']*1000:.0f}ms fade-in")
+
+plan={"source":os.path.abspath(SRC),"audio":audio_meta,"overlay":overlay_meta,"tempo":round(tempo,1),
       "reel_seconds":round(grid_end-grid_start,3),"n_cuts":len(cuts),"cuts":cuts}
 json.dump(plan,open(PLAN,"w"),indent=2)
 print(f"  wrote {PLAN}: {len(cuts)} cuts, {plan['reel_seconds']:.1f}s reel"
@@ -319,37 +338,61 @@ cmd_cut(){
   local src; src="$(find_source)"; [ -n "$src" ] || die "No source video. Run '$0 prep <url>' first."
   [ -f "$PLAN" ] || die "No $PLAN. Run '$0 prep <url>' first."
   mkdir -p "$OUT_DIR"; ensure_cmd ffmpeg ffmpeg ffmpeg; ensure_cmd ffprobe ffmpeg ffmpeg
-  # Build filter graph + input list from plan.json (pure python, no deps).
-  local meta; meta="$(PLAN="$PLAN" python3 - <<'PY'
+  # Build filter graph + ordered input list from plan.json (pure python, no deps).
+  # Input order is fixed: video(0), [ext audio], [overlay]. Python computes the
+  # matching stream indices so the graph and the -i flags stay in sync.
+  local meta; meta="$(PLAN="$PLAN" SRC="$src" python3 - <<'PY'
 import os,json
-p=json.load(open(os.environ["PLAN"])); cuts=p["cuts"]; a=p["audio"]
-ext=a["file"]; parts=[]; labels=""
+p=json.load(open(os.environ["PLAN"])); cuts=p["cuts"]; a=p["audio"]; ov=p.get("overlay")
+src=os.environ["SRC"]; parts=[]; labels=""; idx=1
+a_idx=0
+if a["file"]: a_idx=idx; idx+=1
+o_idx=None
+if ov: o_idx=idx; idx+=1
 for i,c in enumerate(cuts):
     s=c["src_start"]; e=s+c["dur"]; cx=c.get("crop_x",0.5)
-    # per-clip: trim -> scale to cover -> crop with horizontal offset -> normalize
+    # per-clip: trim -> scale to cover -> horizontal-offset crop -> normalize SAR
     parts.append(f"[0:v]trim=start={s}:end={e},setpts=PTS-STARTPTS,"
                  f"scale=1080:1920:force_original_aspect_ratio=increase,"
                  f"crop=1080:1920:(iw-1080)*{cx}:0,setsar=1[v{i}];")
     labels+=f"[v{i}]"
 parts.append(f"{labels}concat=n={len(cuts)}:v=1:a=0[vc];")
-parts.append("[vc]fps=30,format=yuv420p[vout];")
-if ext:
-    parts.append(f"[1:a]atrim=start={a['start']}:end={a['end']},asetpts=PTS-STARTPTS[aout]")
-else:
-    parts.append(f"[0:a]atrim=start={a['start']}:end={a['end']},asetpts=PTS-STARTPTS[aout]")
-print(json.dumps({"fc":"".join(parts),"ext":ext or "","n":len(cuts),"reel":p["reel_seconds"]}))
+parts.append("[vc]fps=30,format=yuv420p[vbase];")
+vlabel="vbase"
+if ov:
+    end=ov.get("end")
+    f=(f"[{o_idx}:v]format=rgba,scale=1080:1920:force_original_aspect_ratio=decrease,"
+       f"pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black@0.0,"
+       f"fade=t=in:st={ov['start']}:d={ov['fade']}:alpha=1")
+    if end: f+=f",fade=t=out:st={end}:d={ov['fade']}:alpha=1"
+    f+="[ov];"
+    parts.append(f)
+    # shortest=1 so the looped-overlay input ends with the main video (avoids hang)
+    parts.append("[vbase][ov]overlay=0:0:format=auto:shortest=1,format=yuv420p[vout];")
+    vlabel="vout"
+src_a = f"{a_idx}:a" if a["file"] else "0:a"
+parts.append(f"[{src_a}]atrim=start={a['start']}:end={a['end']},asetpts=PTS-STARTPTS[aout]")
+print(json.dumps({"fc":"".join(parts),"vlabel":vlabel,"audio":a["file"] or "",
+                  "overlay":(ov["file"] if ov else ""),"n":len(cuts),"reel":p["reel_seconds"]}))
 PY
 )"
-  local fc ext ncuts reel
+  local fc vlabel extaudio overlay ncuts reel
   fc="$(python3 -c "import json,sys;print(json.loads(sys.argv[1])['fc'])" "$meta")"
-  ext="$(python3 -c "import json,sys;print(json.loads(sys.argv[1])['ext'])" "$meta")"
+  vlabel="$(python3 -c "import json,sys;print(json.loads(sys.argv[1])['vlabel'])" "$meta")"
+  extaudio="$(python3 -c "import json,sys;print(json.loads(sys.argv[1])['audio'])" "$meta")"
+  overlay="$(python3 -c "import json,sys;print(json.loads(sys.argv[1])['overlay'])" "$meta")"
   ncuts="$(python3 -c "import json,sys;print(json.loads(sys.argv[1])['n'])" "$meta")"
   reel="$(python3 -c "import json,sys;print(json.loads(sys.argv[1])['reel'])" "$meta")"
   awk "BEGIN{exit !($reel <= $MAX_SECONDS)}" || die "Reel ${reel}s exceeds ${MAX_SECONDS}s cap."
-  say "Rendering $ncuts cuts -> $OUT_DIR/reel.mp4 (H.264 ~$VIDEO_BITRATE, AAC 128k, 30fps, 1080x1920)"
-  local -a inputs=(-i "$src"); [ -n "$ext" ] && inputs+=(-i "$ext")
+  say "Rendering $ncuts cuts -> $OUT_DIR/reel.mp4 (H.264 ~$VIDEO_BITRATE, AAC 128k, 30fps, 1080x1920)${overlay:+ + overlay}"
+  # inputs in the fixed order python assumed: video, [ext audio], [overlay(looped)]
+  local -a inputs=(-i "$src")
+  [ -n "$extaudio" ] && inputs+=(-i "$extaudio")
+  # bound the looped overlay to the reel length so the input is finite (fast + terminates)
+  [ -n "$overlay" ] && inputs+=(-loop 1 -t "$reel" -i "$overlay")
   ffmpeg -y -loglevel error -stats "${inputs[@]}" \
-    -filter_complex "$fc" -map "[vout]" -map "[aout]" -shortest \
+    -filter_complex "$fc" -map "[$vlabel]" -map "[aout]" -shortest \
+    -t "$reel" \
     -c:v libx264 -preset medium -b:v "$VIDEO_BITRATE" -maxrate "$VIDEO_BITRATE" -bufsize 16M \
     -profile:v high -level 4.0 -c:a aac -b:a 128k -ar 48000 -movflags +faststart \
     "$OUT_DIR/reel.mp4"
