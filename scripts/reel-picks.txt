@@ -1,0 +1,106 @@
+# picks.txt — curated shot list for the Reel (make-reel.sh)
+# format: TS [CROP_X]   (CROP_X 0=left .5=center 1=right; omit = center)
+# Ordered for back-to-back shot-type variety, crowd shots spread out (never
+# adjacent), and the requested 45:03->~45:05 moment locked in (lines 30-32).
+# The reel uses these in order until the audio bed runs out (~the first 65-78).
+
+# --- open: guitar / vox / bass rotation, first crowd hit at 2:16 ---
+0:08  0.55   # guitar, motion
+1:21  0.6    # singer at mic
+0:50  0.55   # bassist, white bass
+0:36         # drummer
+4:21         # guitarist at mic
+3:00         # singer w/ bass
+1:26  0.45   # bassist
+2:16         # CROWD / wide
+5:10         # two guitarists
+6:25  0.45   # singer screaming
+2:50         # bassist
+11:45        # drummer
+18:57        # two guitarists, warm light
+7:40         # singer
+8:59         # bassist
+5:16         # CROWD / wide house
+24:40        # guitarist
+15:17        # singer + performer
+10:03        # bassist
+3:19         # two performers (action)
+27:07        # guitarist
+4:06  0.55   # singer
+12:47        # bass closeup
+9:12         # CROWD / house
+15:00        # drummer
+25:19        # singer, arm raised
+27:51        # guitarist at mic
+12:58        # bass closeup
+
+# --- the guaranteed moment: ~2s hold on 45:03-45:05 ---
+37:59        # singer (lead-in)
+45:03        # << your part
+45:04        # << your part (continues)
+45:05        # << your part (out ~here)
+
+# --- mid: keep varying, crowd every ~7-8 ---
+13:56        # CROWD / house
+32:49        # guitarist
+25:11        # singer leaning
+14:41        # bassist
+23:59        # drummer, arms up
+28:22        # guitar motion blur
+41:35  0.4   # singer profile, spotlights
+17:05        # bassist action
+17:58        # CROWD / red wash
+39:26        # guitarist close
+43:25        # singer, blue
+17:27        # bass closeup
+25:46        # hand raised (action)
+48:10        # guitarist smiling
+55:39        # singer
+38:56        # bassist
+23:08        # CROWD / dark house
+48:15        # guitarist
+52:12        # singer, red
+43:56        # bassist, energy
+41:08        # guitarist, blue
+53:04        # singer, blue
+45:19        # bass closeup
+46:35        # CROWD / house w/ audience
+52:44        # guitarist, arm raised
+57:33        # singer screaming
+46:18        # bassist
+55:07        # guitarist
+
+# --- build to the finish: energy + big crowd moments ---
+58:59        # singer screaming, spotlights
+55:47        # bassist reaching out
+56:57        # CROWD / hands up
+55:11        # guitarist reaching
+59:06        # singer
+58:01        # bassist
+55:26        # guitarist
+1:00:17      # singer
+1:01:36      # bass headstock raised
+56:29        # CROWD / stage + crowd
+56:52        # guitarist bent
+1:01:27      # singer, arm up (big)
+1:01:22      # bass motion blur
+57:12        # guitarist reaching
+1:02:12      # singer, arm out
+40:03        # CROWD / green house lights
+57:48        # guitarist bent over
+54:48        # water bottle beat (action)
+1:00:06      # singer, hand on head
+39:38        # guitar motion blur
+1:01:44      # CROWD / finale, longhorn
+59:58        # guitarist jump/kick (action)
+48:40        # guitarist, purple
+1:02:03      # CROWD / finale wide
+57:03        # guitarist
+
+# --- extra tail (only used if the tempo makes for more/shorter cuts) ---
+59:13        # guitarist
+39:21        # bassist
+57:27        # guitarist
+1:01:12      # two performers
+12:52        # bassist
+41:57        # two performers leaning
