@@ -1,0 +1,7 @@
+# Reel pipeline working files (scripts/make-reel.sh) — large media, keep out of the site
+source/
+frames/
+out/
+transcript.txt
+segments.txt
+.reel-venv/
