@@ -61,9 +61,9 @@ ensure_venv(){
   [ -d "$VENV_DIR" ] || { say "Creating analysis venv ($VENV_DIR) ..."; python3 -m venv "$VENV_DIR"; }
   # shellcheck disable=SC1091
   source "$VENV_DIR/bin/activate"
-  if ! python -c "import librosa, numpy" >/dev/null 2>&1; then
-    say "Installing analysis libs (numpy, librosa) — first run only, a few min ..."
-    pip install -q --upgrade pip; pip install -q numpy librosa
+  if ! python -c "import librosa, numpy, PIL" >/dev/null 2>&1; then
+    say "Installing analysis libs (numpy, librosa, pillow) — first run only, a few min ..."
+    pip install -q --upgrade pip; pip install -q numpy librosa pillow
   fi
   ok "analysis stack ready."
 }
@@ -253,10 +253,6 @@ def dur(p):
     o=subprocess.run(["ffprobe","-v","error","-show_entries","format=duration",
         "-of","default=noprint_wrappers=1:nokey=1",p],capture_output=True,text=True); return float(o.stdout)
 def hms(s): return f"{int(s//3600):d}:{int(s%3600//60):02d}:{int(s%60):02d}" if s>=3600 else f"{int(s//60):d}:{int(s%60):02d}"
-FONTS=["/System/Library/Fonts/Supplemental/Arial.ttf","/System/Library/Fonts/Helvetica.ttc",
-       "/Library/Fonts/Arial.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-       "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"]
-FONT=next((f for f in FONTS if os.path.exists(f)),None)
 D=dur(SRC)
 if RS:  # coverage sheet of a range
     a,b=ts2s(RS),ts2s(RE) if RE else ts2s(RS)+60; step=max(1.0,(b-a)/48)
@@ -274,27 +270,45 @@ else:   # candidate sheet: top motion+energy moments, spaced, chronological
         if all(abs(s-c)>=4 for c in chosen): chosen.append(int(s))
         if len(chosen)>=96: break
     secs=sorted(chosen); tag="candidates"
-# extract labeled thumbs into per-sheet subdirs (48 per sheet, 6 cols)
+# Extract plain thumbnails with ffmpeg, then label + tile with Pillow.
+# (Avoids ffmpeg's drawtext/freetype, which some ffmpeg builds lack.)
 import shutil
+from PIL import Image, ImageDraw, ImageFont
+def get_font(size):
+    for p in ["/System/Library/Fonts/Supplemental/Arial.ttf","/Library/Fonts/Arial.ttf",
+              "/System/Library/Fonts/Helvetica.ttc",
+              "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]:
+        try: return ImageFont.truetype(p,size)
+        except Exception: pass
+    try: return ImageFont.load_default(size=size)   # Pillow >= 10
+    except TypeError: return ImageFont.load_default()
+TW,TH,COLS,PAD,per=320,180,6,4,48
+font=get_font(22)
 tmp=os.path.join(OUT,".thumbs")
 if os.path.isdir(tmp): shutil.rmtree(tmp)
-per=48
-for i,s in enumerate(secs):
-    g=i//per; gdir=os.path.join(tmp,f"{g:02d}"); os.makedirs(gdir,exist_ok=True)
-    label=hms(s).replace(":","\\:")
-    dt=(f"drawtext=fontfile='{FONT}':" if FONT else "drawtext=")+ \
-       f"text='{label}':x=6:y=6:fontsize=20:fontcolor=yellow:box=1:boxcolor=black@0.6"
-    subprocess.run(["ffmpeg","-v","error","-y","-ss",f"{s}","-i",SRC,"-frames:v","1",
-        "-vf",f"scale=320:180,{dt}",os.path.join(gdir,f"t{i:04d}.jpg")],check=False)
-# tile each subdir into one sheet
-for g in sorted(os.listdir(tmp)):
-    gdir=os.path.join(tmp,g); n=len(os.listdir(gdir))
-    if not n: continue
-    outp=os.path.join(OUT,f"{tag}_{int(g)+1:02d}.jpg")
-    subprocess.run(["ffmpeg","-v","error","-y","-framerate","1","-pattern_type","glob",
-        "-i",os.path.join(gdir,"t*.jpg"),"-frames:v","1",
-        "-vf",f"tile=6x{math.ceil(n/6)}:padding=4:color=black",outp],check=False)
-    print(f"  wrote {outp} ({n} thumbs)")
+os.makedirs(tmp,exist_ok=True)
+def label_thumb(path,sec):
+    im=Image.open(path).convert("RGB").resize((TW,TH))
+    d=ImageDraw.Draw(im); txt=hms(sec)
+    x0,y0,x1,y1=d.textbbox((0,0),txt,font=font)
+    d.rectangle([3,3,3+(x1-x0)+10,3+(y1-y0)+8],fill=(0,0,0))
+    d.text((8,5),txt,fill=(255,235,0),font=font)
+    return im
+sheets=0
+for k in range(0,len(secs),per):
+    grp=secs[k:k+per]; rows=math.ceil(len(grp)/COLS)
+    canvas=Image.new("RGB",(COLS*TW+(COLS+1)*PAD, rows*TH+(rows+1)*PAD),(0,0,0))
+    for j,s in enumerate(grp):
+        tp=os.path.join(tmp,f"t{j:04d}.jpg")
+        subprocess.run(["ffmpeg","-v","error","-y","-ss",f"{s}","-i",SRC,
+            "-frames:v","1","-vf",f"scale={TW}:{TH}",tp],check=False)
+        if not os.path.exists(tp): continue
+        im=label_thumb(tp,s); r,c=divmod(j,COLS)
+        canvas.paste(im,(PAD+c*(TW+PAD), PAD+r*(TH+PAD)))
+    outp=os.path.join(OUT,f"{tag}_{sheets+1:02d}.jpg")
+    canvas.save(outp,quality=90); sheets+=1
+    print(f"  wrote {outp} ({len(grp)} thumbs)")
+shutil.rmtree(tmp,ignore_errors=True)
 print(f"  timestamps are the source in-points — reference them in picks.txt")
 PY
   ok "Contact sheet(s) in $FRAMES_DIR/ — send them over and I'll build picks.txt"
