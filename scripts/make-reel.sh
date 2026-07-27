@@ -44,9 +44,11 @@
 #
 # Creative look: LOOK=<preset> or FILTER="<raw ffmpeg filter chain>".
 #   presets: bw punch warm cool vignette dramatic film vhs
+#   LOOK_SCOPE=footage (default, grade under the overlay) or =all (grade the
+#   whole composite, overlay included).
 #
 # Env: REEL_SECONDS(75,cap90) CUT_SECONDS(0.7) BEATS_PER_CUT VIDEO_BITRATE(8M)
-#      ANALYZE_FPS(3) SEED(0) PAN LOOK FILTER AUDIO AUDIO_START AUDIO_END
+#      ANALYZE_FPS(3) SEED(0) PAN LOOK FILTER LOOK_SCOPE AUDIO AUDIO_START AUDIO_END
 #      OVERLAY OVERLAY_START OVERLAY_FADE OVERLAY_END OVERLAY_BLEND
 #
 set -euo pipefail
@@ -104,7 +106,7 @@ cmd_prep(){
     AUDIO="$AUDIO" AUDIO_START="$AUDIO_START" AUDIO_END="$AUDIO_END" \
     OVERLAY="${OVERLAY:-}" OVERLAY_START="${OVERLAY_START:-2}" OVERLAY_FADE="${OVERLAY_FADE:-0.2}" OVERLAY_END="${OVERLAY_END:-}" \
     OVERLAY_BLEND="${OVERLAY_BLEND:-}" BEATS_PER_CUT="${BEATS_PER_CUT:-}" \
-    LOOK="${LOOK:-}" FILTER="${FILTER:-}" PAN="${PAN:-}" \
+    LOOK="${LOOK:-}" FILTER="${FILTER:-}" LOOK_SCOPE="${LOOK_SCOPE:-}" PAN="${PAN:-}" \
     python - <<'PY'
 import os, json, subprocess, sys
 import numpy as np
@@ -278,11 +280,13 @@ if OVL:
 
 LOOK=(os.environ.get("LOOK") or "").strip().lower()
 FILTER_RAW=(os.environ.get("FILTER") or "").strip()
-if LOOK or FILTER_RAW: print(f"  look: {FILTER_RAW or LOOK}")
+LOOK_SCOPE=(os.environ.get("LOOK_SCOPE") or "footage").strip().lower()
+if LOOK_SCOPE not in ("footage","all"): LOOK_SCOPE="footage"
+if LOOK or FILTER_RAW: print(f"  look: {FILTER_RAW or LOOK} (scope: {LOOK_SCOPE})")
 if PAN>0: print(f"  auto-pan: ±{PAN/2:.2f} around each shot")
 
 plan={"source":os.path.abspath(SRC),"audio":audio_meta,"overlay":overlay_meta,
-      "look":(LOOK or None),"filter":(FILTER_RAW or None),"tempo":round(tempo,1),
+      "look":(LOOK or None),"filter":(FILTER_RAW or None),"look_scope":LOOK_SCOPE,"tempo":round(tempo,1),
       "reel_seconds":round(grid_end-grid_start,3),"n_cuts":len(cuts),"cuts":cuts}
 json.dump(plan,open(PLAN,"w"),indent=2)
 print(f"  wrote {PLAN}: {len(cuts)} cuts, {plan['reel_seconds']:.1f}s reel"
@@ -411,7 +415,8 @@ LOOKS={"bw":"hue=s=0","punch":"eq=contrast=1.12:saturation=1.35:brightness=0.02"
        "film":"curves=preset=medium_contrast,eq=saturation=1.05,vignette=PI/5,noise=alls=6:allf=t",
        "vhs":"eq=saturation=1.25:contrast=1.05,rgbashift=rh=3:bh=-3,noise=alls=10:allf=t"}
 look_chain=p.get("filter") or (LOOKS.get(p.get("look",""),"") if p.get("look") else "")
-if look_chain:
+scope=(p.get("look_scope") or "footage")   # "footage" (before overlay) or "all" (whole composite)
+if look_chain and scope=="footage":
     parts.append(f"[vbase0]{look_chain},format=yuv420p[vbase];")
 else:
     parts.append("[vbase0]null[vbase];")
@@ -424,7 +429,7 @@ if ov:
     if end: f+=f",fade=t=out:st={end}:d={ov['fade']}:alpha=1"
     f+="[ov];"
     parts.append(f)
-    if blend and blend!="normal":
+    if blend and blend not in ("none","normal"):
         # blend mode: bake the (faded) overlay over black so transparent areas
         # are identity for lighten-family modes (exclusion/screen/difference/...),
         # then blend the whole frame. shortest=1 so looped inputs terminate.
@@ -439,6 +444,10 @@ if ov:
         # plain alpha compositing; shortest=1 so the looped overlay ends with video
         parts.append("[vbase][ov]overlay=0:0:format=auto:shortest=1,format=yuv420p[vout];")
     vlabel="vout"
+# scope=="all": grade the whole composite (overlay included), after compositing
+if look_chain and scope=="all":
+    parts.append(f"[{vlabel}]{look_chain},format=yuv420p[vgraded];")
+    vlabel="vgraded"
 src_a = f"{a_idx}:a" if a["file"] else "0:a"
 parts.append(f"[{src_a}]atrim=start={a['start']}:end={a['end']},asetpts=PTS-STARTPTS[aout]")
 print(json.dumps({"fc":"".join(parts),"vlabel":vlabel,"audio":a["file"] or "",
