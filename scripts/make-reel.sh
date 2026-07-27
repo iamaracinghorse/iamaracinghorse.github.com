@@ -29,10 +29,16 @@
 #
 # Overlay a PNG (e.g. a story frame): set OVERLAY=/path/overlay.png. It fades in
 # at OVERLAY_START (default 2s) over OVERLAY_FADE (default 0.2s) and stays; set
-# OVERLAY_END to fade it back out. Transparency is preserved.
+# OVERLAY_END to fade it back out. Transparency is preserved. OVERLAY_BLEND picks
+# a blend mode (exclusion, screen, difference, addition, lighten, ...) instead of
+# plain alpha; the lighten-family modes work cleanly with transparent PNGs.
 #
-# Env: REEL_SECONDS(75,cap90) CUT_SECONDS(0.7) VIDEO_BITRATE(8M) ANALYZE_FPS(3)
-#      SEED(0) AUDIO AUDIO_START AUDIO_END OVERLAY OVERLAY_START OVERLAY_FADE OVERLAY_END
+# Cut pace: CUT_SECONDS targets a cut length; BEATS_PER_CUT forces an exact
+# number of beats per cut (e.g. BEATS_PER_CUT=2) and overrides CUT_SECONDS.
+#
+# Env: REEL_SECONDS(75,cap90) CUT_SECONDS(0.7) BEATS_PER_CUT VIDEO_BITRATE(8M)
+#      ANALYZE_FPS(3) SEED(0) AUDIO AUDIO_START AUDIO_END
+#      OVERLAY OVERLAY_START OVERLAY_FADE OVERLAY_END OVERLAY_BLEND
 #
 set -euo pipefail
 
@@ -88,6 +94,7 @@ cmd_prep(){
     ANALYZE_FPS="$ANALYZE_FPS" MAX_SECONDS="$MAX_SECONDS" SEED="$SEED" \
     AUDIO="$AUDIO" AUDIO_START="$AUDIO_START" AUDIO_END="$AUDIO_END" \
     OVERLAY="${OVERLAY:-}" OVERLAY_START="${OVERLAY_START:-2}" OVERLAY_FADE="${OVERLAY_FADE:-0.2}" OVERLAY_END="${OVERLAY_END:-}" \
+    OVERLAY_BLEND="${OVERLAY_BLEND:-}" BEATS_PER_CUT="${BEATS_PER_CUT:-}" \
     python - <<'PY'
 import os, json, subprocess, sys
 import numpy as np
@@ -150,7 +157,9 @@ tempo=float(np.atleast_1d(tempo)[0]); print(f"  tempo: {tempo:.1f} BPM")
 
 # beats that fall in the grid, as reel-timeline offsets
 gb=[b for b in beats if grid_start-1e-6<=b<=grid_end+1e-6] or [grid_start,grid_end]
-beat_dur=60.0/tempo; bpc=max(1,int(round(CUTLEN/beat_dur)))
+beat_dur=60.0/tempo
+_bpc_env=os.environ.get("BEATS_PER_CUT","").strip()
+bpc=int(_bpc_env) if _bpc_env else max(1,int(round(CUTLEN/beat_dur)))
 bounds=gb[::bpc]
 if bounds[-1]<grid_end-1e-3: bounds.append(grid_end)
 slots=[(bounds[i]-grid_start,bounds[i+1]-bounds[i]) for i in range(len(bounds)-1)]
@@ -238,8 +247,10 @@ if OVL:
     overlay_meta={"file":os.path.abspath(OVL),
                   "start":float(os.environ.get("OVERLAY_START") or 2),
                   "fade":float(os.environ.get("OVERLAY_FADE") or 0.2),
-                  "end":(float(os.environ["OVERLAY_END"]) if os.environ.get("OVERLAY_END") else None)}
-    print(f"  overlay: {OVL} @ {overlay_meta['start']}s, {overlay_meta['fade']*1000:.0f}ms fade-in")
+                  "end":(float(os.environ["OVERLAY_END"]) if os.environ.get("OVERLAY_END") else None),
+                  "blend":(os.environ.get("OVERLAY_BLEND") or "").strip().lower()}
+    print(f"  overlay: {OVL} @ {overlay_meta['start']}s, {overlay_meta['fade']*1000:.0f}ms fade-in"
+          + (f", blend={overlay_meta['blend']}" if overlay_meta['blend'] else ""))
 
 plan={"source":os.path.abspath(SRC),"audio":audio_meta,"overlay":overlay_meta,"tempo":round(tempo,1),
       "reel_seconds":round(grid_end-grid_start,3),"n_cuts":len(cuts),"cuts":cuts}
@@ -360,15 +371,27 @@ parts.append(f"{labels}concat=n={len(cuts)}:v=1:a=0[vc];")
 parts.append("[vc]fps=30,format=yuv420p[vbase];")
 vlabel="vbase"
 if ov:
-    end=ov.get("end")
+    end=ov.get("end"); blend=(ov.get("blend") or "")
     f=(f"[{o_idx}:v]format=rgba,scale=1080:1920:force_original_aspect_ratio=decrease,"
        f"pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black@0.0,"
        f"fade=t=in:st={ov['start']}:d={ov['fade']}:alpha=1")
     if end: f+=f",fade=t=out:st={end}:d={ov['fade']}:alpha=1"
     f+="[ov];"
     parts.append(f)
-    # shortest=1 so the looped-overlay input ends with the main video (avoids hang)
-    parts.append("[vbase][ov]overlay=0:0:format=auto:shortest=1,format=yuv420p[vout];")
+    if blend and blend!="normal":
+        # blend mode: bake the (faded) overlay over black so transparent areas
+        # are identity for lighten-family modes (exclusion/screen/difference/...),
+        # then blend the whole frame. shortest=1 so looped inputs terminate.
+        dur=p["reel_seconds"]+1
+        # bake overlay over black, then blend in RGB (gbrp) so chroma is preserved
+        # where the overlay is transparent; YUV blending would grey the whole frame.
+        parts.append(f"color=c=black:s=1080x1920:r=30:d={dur},format=rgba[obg];")
+        parts.append("[obg][ov]overlay=0:0:format=auto:shortest=1,format=gbrp[ovflat];")
+        parts.append("[vbase]format=gbrp[vrgb];")
+        parts.append(f"[vrgb][ovflat]blend=all_mode={blend}:shortest=1,format=yuv420p[vout];")
+    else:
+        # plain alpha compositing; shortest=1 so the looped overlay ends with video
+        parts.append("[vbase][ov]overlay=0:0:format=auto:shortest=1,format=yuv420p[vout];")
     vlabel="vout"
 src_a = f"{a_idx}:a" if a["file"] else "0:a"
 parts.append(f"[{src_a}]atrim=start={a['start']}:end={a['end']},asetpts=PTS-STARTPTS[aout]")
