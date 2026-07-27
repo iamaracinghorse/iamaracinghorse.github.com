@@ -36,8 +36,17 @@
 # Cut pace: CUT_SECONDS targets a cut length; BEATS_PER_CUT forces an exact
 # number of beats per cut (e.g. BEATS_PER_CUT=2) and overrides CUT_SECONDS.
 #
+# Framing / motion:
+#   * picks.txt CROP_X can be a single center (0.6) OR a pan "0.3>0.7" that
+#     slides the crop across the shot (great for horizontal->vertical footage).
+#   * PAN=0.2 adds a gentle auto-drift around each shot's center (alternating
+#     direction) for subtle life on otherwise-static crops.
+#
+# Creative look: LOOK=<preset> or FILTER="<raw ffmpeg filter chain>".
+#   presets: bw punch warm cool vignette dramatic film vhs
+#
 # Env: REEL_SECONDS(75,cap90) CUT_SECONDS(0.7) BEATS_PER_CUT VIDEO_BITRATE(8M)
-#      ANALYZE_FPS(3) SEED(0) AUDIO AUDIO_START AUDIO_END
+#      ANALYZE_FPS(3) SEED(0) PAN LOOK FILTER AUDIO AUDIO_START AUDIO_END
 #      OVERLAY OVERLAY_START OVERLAY_FADE OVERLAY_END OVERLAY_BLEND
 #
 set -euo pipefail
@@ -95,6 +104,7 @@ cmd_prep(){
     AUDIO="$AUDIO" AUDIO_START="$AUDIO_START" AUDIO_END="$AUDIO_END" \
     OVERLAY="${OVERLAY:-}" OVERLAY_START="${OVERLAY_START:-2}" OVERLAY_FADE="${OVERLAY_FADE:-0.2}" OVERLAY_END="${OVERLAY_END:-}" \
     OVERLAY_BLEND="${OVERLAY_BLEND:-}" BEATS_PER_CUT="${BEATS_PER_CUT:-}" \
+    LOOK="${LOOK:-}" FILTER="${FILTER:-}" PAN="${PAN:-}" \
     python - <<'PY'
 import os, json, subprocess, sys
 import numpy as np
@@ -189,14 +199,23 @@ exc=0.6*norm(mot)+0.4*norm(ae)
 print(f"  motion sampled: {nfr} frames @ {AFPS}fps")
 
 # ---- parse picks.txt -------------------------------------------------------
+# frame field: "0.6" static crop center, or "0.3>0.7" pan from left->right.
+PAN=float(os.environ.get("PAN") or 0)
+def clip01(v): return max(0.0,min(1.0,v))
 picks=[]
 if os.path.exists(PICKS):
     for ln in open(PICKS):
         ln=ln.split("#")[0].strip()
         if not ln: continue
         parts=ln.split()
-        t=ts2s(parts[0]); cx=float(parts[1]) if len(parts)>1 else 0.5
-        picks.append((t,max(0.0,min(1.0,cx))))
+        t=ts2s(parts[0])
+        if len(parts)>1 and ">" in parts[1]:
+            a,b=parts[1].split(">"); cx0,cx1,is_pan=clip01(float(a)),clip01(float(b)),True
+        elif len(parts)>1:
+            cx0=cx1=clip01(float(parts[1])); is_pan=False
+        else:
+            cx0=cx1=0.5; is_pan=False
+        picks.append((t,cx0,cx1,is_pan))
     print(f"  picks.txt: {len(picks)} curated moment(s)")
 
 # ---- choose a source moment (sec) + crop_x for every slot ------------------
@@ -233,12 +252,17 @@ if free:
     i=0
     while len(chosen)<len(free): chosen.append(int((cand or [0])[i%len(cand or [0])])); i+=1
     order=sorted(zip(free,sorted(chosen[:len(free)])))
-    for slot_i,sec in order: assigned[slot_i]=(float(sec),0.5)
+    for slot_i,sec in order: assigned[slot_i]=(float(sec),0.5,0.5,False)
 
 cuts=[]
-for (s0,slen),a in zip(slots,assigned):
-    sec,cx=a; s=float(min(sec,max(0.0,DUR-slen)))
-    cuts.append({"src_start":round(s,3),"dur":round(slen,3),"crop_x":round(cx,3),
+for idx,((s0,slen),a) in enumerate(zip(slots,assigned)):
+    sec,cx0,cx1,is_pan=a
+    if PAN>0 and not is_pan:                 # gentle auto-drift around the center
+        d=1 if idx%2==0 else -1
+        cx0,cx1=clip01(cx0 - d*PAN/2), clip01(cx1 + d*PAN/2)
+    s=float(min(sec,max(0.0,DUR-slen)))
+    cuts.append({"src_start":round(s,3),"dur":round(slen,3),
+                 "crop_x0":round(cx0,3),"crop_x1":round(cx1,3),
                  "excite":round(float(exc[int(min(sec,NS-1))]),3)})
 
 OVL=os.environ.get("OVERLAY","")
@@ -252,7 +276,13 @@ if OVL:
     print(f"  overlay: {OVL} @ {overlay_meta['start']}s, {overlay_meta['fade']*1000:.0f}ms fade-in"
           + (f", blend={overlay_meta['blend']}" if overlay_meta['blend'] else ""))
 
-plan={"source":os.path.abspath(SRC),"audio":audio_meta,"overlay":overlay_meta,"tempo":round(tempo,1),
+LOOK=(os.environ.get("LOOK") or "").strip().lower()
+FILTER_RAW=(os.environ.get("FILTER") or "").strip()
+if LOOK or FILTER_RAW: print(f"  look: {FILTER_RAW or LOOK}")
+if PAN>0: print(f"  auto-pan: ±{PAN/2:.2f} around each shot")
+
+plan={"source":os.path.abspath(SRC),"audio":audio_meta,"overlay":overlay_meta,
+      "look":(LOOK or None),"filter":(FILTER_RAW or None),"tempo":round(tempo,1),
       "reel_seconds":round(grid_end-grid_start,3),"n_cuts":len(cuts),"cuts":cuts}
 json.dump(plan,open(PLAN,"w"),indent=2)
 print(f"  wrote {PLAN}: {len(cuts)} cuts, {plan['reel_seconds']:.1f}s reel"
@@ -361,14 +391,30 @@ if a["file"]: a_idx=idx; idx+=1
 o_idx=None
 if ov: o_idx=idx; idx+=1
 for i,c in enumerate(cuts):
-    s=c["src_start"]; e=s+c["dur"]; cx=c.get("crop_x",0.5)
-    # per-clip: trim -> scale to cover -> horizontal-offset crop -> normalize SAR
+    s=c["src_start"]; e=s+c["dur"]; dur=max(0.05,c["dur"])
+    c0=c.get("crop_x0", c.get("crop_x",0.5)); c1=c.get("crop_x1", c0)
+    # per-clip: trim -> scale to cover -> crop with a (possibly time-varying)
+    # horizontal offset that pans c0->c1 across the shot -> normalize SAR.
+    # t runs 0..dur within the clip (setpts reset), so no clamp needed.
+    xexpr=f"(iw-1080)*({c0}+{(c1-c0):.5f}*t/{dur})"
     parts.append(f"[0:v]trim=start={s}:end={e},setpts=PTS-STARTPTS,"
                  f"scale=1080:1920:force_original_aspect_ratio=increase,"
-                 f"crop=1080:1920:(iw-1080)*{cx}:0,setsar=1[v{i}];")
+                 f"crop=1080:1920:{xexpr}:0,setsar=1[v{i}];")
     labels+=f"[v{i}]"
 parts.append(f"{labels}concat=n={len(cuts)}:v=1:a=0[vc];")
-parts.append("[vc]fps=30,format=yuv420p[vbase];")
+parts.append("[vc]fps=30,format=yuv420p[vbase0];")
+# creative look / filter, applied to the footage (before any overlay)
+LOOKS={"bw":"hue=s=0","punch":"eq=contrast=1.12:saturation=1.35:brightness=0.02",
+       "warm":"colorbalance=rs=0.06:gs=0.02:bs=-0.06,eq=saturation=1.12",
+       "cool":"colorbalance=rs=-0.06:bs=0.08","vignette":"vignette=PI/4.5",
+       "dramatic":"eq=contrast=1.25:saturation=0.85,vignette=PI/4.5",
+       "film":"curves=preset=medium_contrast,eq=saturation=1.05,vignette=PI/5,noise=alls=6:allf=t",
+       "vhs":"eq=saturation=1.25:contrast=1.05,rgbashift=rh=3:bh=-3,noise=alls=10:allf=t"}
+look_chain=p.get("filter") or (LOOKS.get(p.get("look",""),"") if p.get("look") else "")
+if look_chain:
+    parts.append(f"[vbase0]{look_chain},format=yuv420p[vbase];")
+else:
+    parts.append("[vbase0]null[vbase];")
 vlabel="vbase"
 if ov:
     end=ov.get("end"); blend=(ov.get("blend") or "")

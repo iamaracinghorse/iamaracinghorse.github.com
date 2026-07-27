@@ -1,48 +1,47 @@
 # picks.txt — curated shot list for the Reel (make-reel.sh)
-# format: TS [CROP_X]   (CROP_X 0=left .5=center 1=right; omit = center)
+# format: TS [FRAME]   FRAME = crop center 0..1 (0=left .5=center 1=right),
+#                      or a pan like 0.3>0.7 that slides across the shot.
 #
-# Rebalanced for BEATS_PER_CUT=3 (~30 cuts): bassist (black tee/white bass) cut
-# way down; crowd shots up and starting early; drummer, the other guitarist, and
-# the green-shirt singer boosted. No two same-type shots back-to-back. The
-# 45:03 moment is locked in (one ~1.7s cut). Only ~the first 30 lines are used.
+# Tuned for BEATS_PER_CUT=3 (~30 cuts). Performer shots are pulled from the
+# EARLIER part of the show (better camera variety, far less bassist-cam);
+# crowd shots come from anywhere (a wide crowd shot doesn't over-feature the
+# bassist). Bassist (black tee/white bass) is down to a single shot. Crowd is
+# heavy and starts at cut 2. crop centers are eyeballed from the contact sheets
+# to keep subjects framed; pair with PAN=0.15 for gentle motion.
 
-0:08  0.55   # guitarist
-6:25  0.45   # singer (green), screaming
-2:16         # CROWD  <- early crowd
-0:36         # drummer
-24:40        # guitarist
-7:40         # singer (green)
-5:16         # CROWD
-11:45        # drummer
-18:57        # guitarist
-25:19        # singer (green), arm raised
-9:12         # CROWD
-48:10        # guitarist, smiling
-41:35  0.4   # singer (green), profile
-15:00        # drummer
-52:44        # guitarist, arm raised
-13:56        # CROWD
-53:04        # singer (green)
-45:19        # bassist (one of only two)
-45:03        # << your locked-in moment (~1.7s)
-23:59        # drummer, arms up
-55:11        # guitarist, reaching
-57:33        # singer (green), screaming
-23:08        # CROWD
-55:07        # guitarist
-58:59        # singer (green), spotlights
-46:35        # CROWD  (audience visible)
-59:58        # guitarist, jump/kick
-1:01:27      # singer (green), arm up (big)
-56:57        # CROWD, hands up
-1:00:06      # guitarist
+0:08   0.6    # guitarist (subject right)
+2:16          # CROWD  <- early
+6:25   0.4    # singer (green), screaming (face left)
+0:36          # drummer
+5:16          # CROWD
+24:40         # guitarist
+7:40          # singer (green)
+9:12          # CROWD
+11:45         # drummer
+18:57  0.55   # guitarist
+13:56         # CROWD
+25:19         # singer (green), arm raised
+27:07         # guitarist
+17:58         # CROWD (red wash)
+15:00         # drummer
+4:21          # guitarist
+23:08         # CROWD
+45:19         # bassist (the only one)
+45:03         # << your locked-in moment
+46:35         # CROWD (audience visible)
+27:00  0.6    # guitarist (bent, right)
+15:17  0.4    # singer (green) (face left)
+56:57         # CROWD (hands up)
+23:59         # drummer, arms up
+5:10   0.3>0.7 # two guitarists — pan across them
+40:03         # CROWD (house lights)
+25:11  0.4    # singer (green), leaning
+28:22         # guitarist (motion blur)
+46:26         # CROWD
+4:06   0.55   # singer (green)
 
-# --- buffer (only used if the tempo yields more/shorter cuts) ---
-55:47        # bassist (second and last)
-1:02:12      # singer (green), arm out
-40:03        # CROWD, house lights
-48:40        # guitarist, purple
-1:01:44      # CROWD, finale
-57:12        # guitarist
-43:25        # singer (green)
-1:00:17      # singer (green)
+# --- buffer (used only if the tempo yields more/shorter cuts) ---
+1:01:44        # CROWD (finale)
+27:51  0.45   # guitarist
+56:29          # CROWD
+3:19           # two performers
