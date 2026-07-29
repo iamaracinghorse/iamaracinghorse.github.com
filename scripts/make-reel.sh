@@ -44,12 +44,20 @@
 #
 # Creative look: LOOK=<preset> or FILTER="<raw ffmpeg filter chain>".
 #   presets: bw punch warm cool vignette dramatic film vhs
-#   LOOK_SCOPE=footage (default, grade under the overlay) or =all (grade the
-#   whole composite, overlay included).
+#   LOOK_SCOPE=footage (default) or =all (grade the overlay too).
+#   LOOK_INTENSITY=1 (default); >1 pushes the preset harder (e.g. 1.6 = more VHS).
+#
+# Motion / feel:
+#   FPS=30 (default; try 15 for a choppier, grittier cadence)
+#   SHAKE=0 (px of handheld vertical/horizontal jitter, e.g. 12)
+#   SLOWMO=0 (auto-pick this many shots to play slowed) SLOWMO_RATE=2 (2 = half speed)
+#   LENGTH_JITTER=0 (0..1 chance each cut gets ±1 beat — subtle on-beat variety)
+#   AUTOCENTER=0 (=1 detects the main subject per shot and centers on them; needs OpenCV)
 #
 # Env: REEL_SECONDS(75,cap90) CUT_SECONDS(0.7) BEATS_PER_CUT VIDEO_BITRATE(8M)
-#      ANALYZE_FPS(3) SEED(0) PAN LOOK FILTER LOOK_SCOPE AUDIO AUDIO_START AUDIO_END
-#      OVERLAY OVERLAY_START OVERLAY_FADE OVERLAY_END OVERLAY_BLEND
+#      ANALYZE_FPS(3) SEED(0) PAN LOOK FILTER LOOK_SCOPE LOOK_INTENSITY
+#      FPS SHAKE SLOWMO SLOWMO_RATE LENGTH_JITTER AUTOCENTER
+#      AUDIO AUDIO_START AUDIO_END OVERLAY OVERLAY_START OVERLAY_FADE OVERLAY_END OVERLAY_BLEND
 #
 set -euo pipefail
 
@@ -88,6 +96,12 @@ ensure_venv(){
   fi
   ok "analysis stack ready."
 }
+ensure_cv(){  # OpenCV (pinned to 4.x — v5 dropped the classic detectors), for AUTOCENTER
+  if ! python -c "import cv2; cv2.CascadeClassifier" >/dev/null 2>&1; then
+    say "Installing OpenCV for auto-centering (first run only) ..."
+    pip install -q "opencv-python-headless>=4.8,<5"
+  fi
+}
 find_source(){ ls -1 "$SOURCE_DIR"/video.* 2>/dev/null | grep -viE '\.(part|ytdl)$' | head -1; }
 
 # ------------------------------------------------------------------ PREP
@@ -101,12 +115,15 @@ cmd_prep(){
   ok "Downloaded: $src"
   say "Step 3 — analyze + build $PLAN"
   ensure_venv
+  [ "${AUTOCENTER:-}" = "1" ] && ensure_cv
   SRC="$src" PLAN="$PLAN" PICKS="$PICKS" REEL_SECONDS="$REEL_SECONDS" CUT_SECONDS="$CUT_SECONDS" \
     ANALYZE_FPS="$ANALYZE_FPS" MAX_SECONDS="$MAX_SECONDS" SEED="$SEED" \
     AUDIO="$AUDIO" AUDIO_START="$AUDIO_START" AUDIO_END="$AUDIO_END" \
     OVERLAY="${OVERLAY:-}" OVERLAY_START="${OVERLAY_START:-2}" OVERLAY_FADE="${OVERLAY_FADE:-0.2}" OVERLAY_END="${OVERLAY_END:-}" \
     OVERLAY_BLEND="${OVERLAY_BLEND:-}" BEATS_PER_CUT="${BEATS_PER_CUT:-}" \
     LOOK="${LOOK:-}" FILTER="${FILTER:-}" LOOK_SCOPE="${LOOK_SCOPE:-}" PAN="${PAN:-}" \
+    FPS="${FPS:-30}" SHAKE="${SHAKE:-0}" SLOWMO="${SLOWMO:-0}" SLOWMO_RATE="${SLOWMO_RATE:-2}" \
+    LENGTH_JITTER="${LENGTH_JITTER:-0}" LOOK_INTENSITY="${LOOK_INTENSITY:-1}" AUTOCENTER="${AUTOCENTER:-0}" \
     python - <<'PY'
 import os, json, subprocess, sys
 import numpy as np
@@ -139,66 +156,96 @@ def norm(x):
 DUR=dur(SRC); print(f"  source duration: {DUR:.1f}s")
 import librosa
 
-# ---- soundtrack + beat grid ------------------------------------------------
-if AUDIO:
-    a_start=ts2s(A_START); a_end=ts2s(A_END) if A_END else a_start+REEL
-    y=decode(AUDIO,a_start,a_end)
-    if y.size==0: sys.exit(f"No audio decoded from {AUDIO}")
-    tempo,bf=librosa.beat.beat_track(y=y,sr=SR); beats=librosa.frames_to_time(bf,sr=SR)
-    grid_start,grid_end=(float(beats[0]),float(beats[-1])) if len(beats)>=4 else (0.0,y.size/SR)
-    audio_meta={"file":os.path.abspath(AUDIO),"start":round(a_start+grid_start,3),"end":round(a_start+grid_end,3)}
-    print(f"  external soundtrack: {AUDIO} [{a_start:.1f}->{a_end:.1f}s]")
-else:
-    y=decode(SRC)
-    if y.size==0: sys.exit("No audio in source.")
-    tempo,bf=librosa.beat.beat_track(y=y,sr=SR); beats=librosa.frames_to_time(bf,sr=SR)
-    NS=int(np.floor(min(DUR,y.size/SR)))
-    hop=512; rms=librosa.feature.rms(y=y,hop_length=hop)[0]
-    rt=librosa.frames_to_time(np.arange(len(rms)),sr=SR,hop_length=hop)
-    aud_sec=np.array([rms[(rt>=s)&(rt<s+1)].mean() if ((rt>=s)&(rt<s+1)).any() else 0 for s in range(NS)])
-    win=int(round(REEL))
-    if win>=NS: bs=0.0
-    else:
-        cs=np.concatenate([[0],np.cumsum(aud_sec)]); bs=float(np.argmax(cs[win:]-cs[:-win]))
-    bs=max(0.0,min(bs,max(0.0,DUR-REEL)))
-    bin_=[b for b in beats if bs<=b<=bs+REEL]
-    if len(bin_)<4: bin_=list(beats[:max(4,int(REEL*float(np.atleast_1d(tempo)[0])/60))])
-    grid_start,grid_end=float(bin_[0]),float(bin_[-1]); beats=np.array(bin_)
-    audio_meta={"file":None,"start":round(grid_start,3),"end":round(grid_end,3)}
-tempo=float(np.atleast_1d(tempo)[0]); print(f"  tempo: {tempo:.1f} BPM")
+# ---- cache (so re-runs that only change picks/look/pan/etc. are fast) ------
+import hashlib
+CACHE="./.reel-cache"; os.makedirs(CACHE,exist_ok=True)
+def ckey(*p): return hashlib.md5("|".join(map(str,p)).encode()).hexdigest()
+def mtime(p):
+    try: return round(os.path.getmtime(p),1)
+    except Exception: return 0
 
-# beats that fall in the grid, as reel-timeline offsets
+# ---- soundtrack + beat grid (cached on audio inputs) -----------------------
+akey=ckey("aud2",os.path.abspath(AUDIO) if AUDIO else os.path.abspath(SRC),
+          mtime(AUDIO or SRC),A_START,A_END,round(REEL,2),bool(AUDIO))
+apath=os.path.join(CACHE,akey+".npz")
+if os.path.exists(apath):
+    z=np.load(apath,allow_pickle=True)
+    tempo=float(z["tempo"]); beats=z["beats"]; grid_start=float(z["gs"]); grid_end=float(z["ge"])
+    audio_meta=z["meta"].item(); aud_sec=z["aud_sec"]; print("  soundtrack: cached")
+else:
+    if AUDIO:
+        a_start=ts2s(A_START); a_end=ts2s(A_END) if A_END else a_start+REEL
+        y=decode(AUDIO,a_start,a_end)
+        if y.size==0: sys.exit(f"No audio decoded from {AUDIO}")
+        tempo,bf=librosa.beat.beat_track(y=y,sr=SR); beats=librosa.frames_to_time(bf,sr=SR)
+        grid_start,grid_end=(float(beats[0]),float(beats[-1])) if len(beats)>=4 else (0.0,y.size/SR)
+        audio_meta={"file":os.path.abspath(AUDIO),"start":round(a_start+grid_start,3),"end":round(a_start+grid_end,3)}
+        aud_sec=np.zeros(1); print(f"  external soundtrack: {AUDIO} [{a_start:.1f}->{a_end:.1f}s]")
+    else:
+        y=decode(SRC)
+        if y.size==0: sys.exit("No audio in source.")
+        tempo,bf=librosa.beat.beat_track(y=y,sr=SR); beats=librosa.frames_to_time(bf,sr=SR)
+        NSa=int(np.floor(min(DUR,y.size/SR)))
+        hop=512; rms=librosa.feature.rms(y=y,hop_length=hop)[0]
+        rt=librosa.frames_to_time(np.arange(len(rms)),sr=SR,hop_length=hop)
+        aud_sec=np.array([rms[(rt>=s)&(rt<s+1)].mean() if ((rt>=s)&(rt<s+1)).any() else 0 for s in range(NSa)])
+        win=int(round(REEL))
+        if win>=NSa: bs=0.0
+        else:
+            cs=np.concatenate([[0],np.cumsum(aud_sec)]); bs=float(np.argmax(cs[win:]-cs[:-win]))
+        bs=max(0.0,min(bs,max(0.0,DUR-REEL)))
+        bin_=[b for b in beats if bs<=b<=bs+REEL]
+        if len(bin_)<4: bin_=list(beats[:max(4,int(REEL*float(np.atleast_1d(tempo)[0])/60))])
+        grid_start,grid_end=float(bin_[0]),float(bin_[-1]); beats=np.array(bin_)
+        audio_meta={"file":None,"start":round(grid_start,3),"end":round(grid_end,3)}
+    tempo=float(np.atleast_1d(tempo)[0])
+    np.savez(apath,tempo=tempo,beats=np.asarray(beats),gs=grid_start,ge=grid_end,
+             meta=np.array(audio_meta,dtype=object),aud_sec=aud_sec)
+print(f"  tempo: {tempo:.1f} BPM")
+
+# beats within the grid; build cut boundaries (optionally length-jittered on-beat)
 gb=[b for b in beats if grid_start-1e-6<=b<=grid_end+1e-6] or [grid_start,grid_end]
 beat_dur=60.0/tempo
 _bpc_env=os.environ.get("BEATS_PER_CUT","").strip()
 bpc=int(_bpc_env) if _bpc_env else max(1,int(round(CUTLEN/beat_dur)))
-bounds=gb[::bpc]
+JIT=float(os.environ.get("LENGTH_JITTER") or 0)   # 0..1 chance a cut gets ±1 beat
+if JIT>0 and len(gb)>bpc+1:
+    bounds=[gb[0]]; i=0
+    while i<len(gb)-1:
+        step=bpc+(int(rng.choice([-1,1])) if rng.random()<JIT else 0)
+        step=max(1,step); i=min(i+step,len(gb)-1); bounds.append(gb[i])
+else:
+    bounds=list(gb[::bpc])
 if bounds[-1]<grid_end-1e-3: bounds.append(grid_end)
 slots=[(bounds[i]-grid_start,bounds[i+1]-bounds[i]) for i in range(len(bounds)-1)]
 slots=[(a,b) for a,b in slots if b>0.05]
 nslots=len(slots)
-print(f"  audio bed span: {grid_end-grid_start:.1f}s, cuts: {nslots} (~{CUTLEN}s, {bpc} beat/cut)")
+print(f"  audio bed span: {grid_end-grid_start:.1f}s, cuts: {nslots} ({bpc} beat/cut{', jittered' if JIT>0 else ''})")
 
-# ---- motion + frame signatures across the whole video ----------------------
-NS=int(np.floor(DUR))
-raw=subprocess.run(["ffmpeg","-v","error","-i",SRC,"-vf",f"fps={AFPS},scale={W}:{H},format=gray",
-    "-f","rawvideo","-pix_fmt","gray","-"],capture_output=True).stdout
-buf=np.frombuffer(raw,dtype=np.uint8); nfr=buf.size//(W*H)
-fr=buf[:nfr*W*H].reshape(nfr,H,W).astype(np.float32)
-d=np.abs(np.diff(fr.reshape(nfr,-1),axis=0)).mean(axis=1) if nfr>1 else np.zeros(1)
-ft=np.arange(len(d))/AFPS
-mot=np.array([d[(ft>=s)&(ft<s+1)].mean() if ((ft>=s)&(ft<s+1)).any() else 0 for s in range(NS)])
-# 8x8 signature per second (for visual-variety selection)
-sig=np.zeros((NS,64))
-for s in range(NS):
-    idx=int(min(s*AFPS,nfr-1)); f=fr[idx][:88,:160].reshape(8,11,8,20).mean(axis=(1,3))
-    sig[s]=f.flatten()
-if not AUDIO:
-    ae=np.interp(np.arange(NS),np.arange(len(aud_sec)),aud_sec) if len(aud_sec)>1 else np.zeros(NS)
+# ---- motion + frame signatures across the whole video (cached on source) ---
+mkey=ckey("mot2",os.path.abspath(SRC),mtime(SRC),AFPS,int(DUR))
+mpath=os.path.join(CACHE,mkey+".npz")
+if os.path.exists(mpath):
+    z=np.load(mpath); mot=z["mot"]; sig=z["sig"]; NS=int(z["ns"]); print("  motion: cached")
+else:
+    NS=int(np.floor(DUR))
+    raw=subprocess.run(["ffmpeg","-v","error","-i",SRC,"-vf",f"fps={AFPS},scale={W}:{H},format=gray",
+        "-f","rawvideo","-pix_fmt","gray","-"],capture_output=True).stdout
+    buf=np.frombuffer(raw,dtype=np.uint8); nfr=buf.size//(W*H)
+    fr=buf[:nfr*W*H].reshape(nfr,H,W).astype(np.float32)
+    d=np.abs(np.diff(fr.reshape(nfr,-1),axis=0)).mean(axis=1) if nfr>1 else np.zeros(1)
+    ft=np.arange(len(d))/AFPS
+    mot=np.array([d[(ft>=s)&(ft<s+1)].mean() if ((ft>=s)&(ft<s+1)).any() else 0 for s in range(NS)])
+    sig=np.zeros((NS,64))
+    for s in range(NS):
+        idx=int(min(s*AFPS,nfr-1)); f=fr[idx][:88,:160].reshape(8,11,8,20).mean(axis=(1,3))
+        sig[s]=f.flatten()
+    np.savez(mpath,mot=mot,sig=sig,ns=NS); print(f"  motion sampled: {nfr} frames @ {AFPS}fps")
+if (not AUDIO) and aud_sec.size>1:
+    ae=np.interp(np.arange(NS),np.arange(len(aud_sec)),aud_sec)
 else:
     ae=np.zeros(NS)
 exc=0.6*norm(mot)+0.4*norm(ae)
-print(f"  motion sampled: {nfr} frames @ {AFPS}fps")
 
 # ---- parse picks.txt -------------------------------------------------------
 # frame field: "0.6" static crop center, or "0.3>0.7" pan from left->right.
@@ -210,14 +257,14 @@ if os.path.exists(PICKS):
         ln=ln.split("#")[0].strip()
         if not ln: continue
         parts=ln.split()
-        t=ts2s(parts[0])
+        t=ts2s(parts[0]); manual=len(parts)>1
         if len(parts)>1 and ">" in parts[1]:
             a,b=parts[1].split(">"); cx0,cx1,is_pan=clip01(float(a)),clip01(float(b)),True
         elif len(parts)>1:
             cx0=cx1=clip01(float(parts[1])); is_pan=False
         else:
             cx0=cx1=0.5; is_pan=False
-        picks.append((t,cx0,cx1,is_pan))
+        picks.append((t,cx0,cx1,is_pan,manual))
     print(f"  picks.txt: {len(picks)} curated moment(s)")
 
 # ---- choose a source moment (sec) + crop_x for every slot ------------------
@@ -254,18 +301,68 @@ if free:
     i=0
     while len(chosen)<len(free): chosen.append(int((cand or [0])[i%len(cand or [0])])); i+=1
     order=sorted(zip(free,sorted(chosen[:len(free)])))
-    for slot_i,sec in order: assigned[slot_i]=(float(sec),0.5,0.5,False)
+    for slot_i,sec in order: assigned[slot_i]=(float(sec),0.5,0.5,False,False)
 
-cuts=[]
+# ---- optional auto-center: detect the main subject per shot (OpenCV) -------
+AUTOCENTER=os.environ.get("AUTOCENTER")=="1"
+ac_cache={}
+if AUTOCENTER:
+    acpath=os.path.join(CACHE,"autocenter_"+ckey(os.path.abspath(SRC),mtime(SRC))+".json")
+    if os.path.exists(acpath):
+        try: ac_cache=json.load(open(acpath))
+        except Exception: ac_cache={}
+    import cv2
+    _face=cv2.CascadeClassifier(cv2.data.haarcascades+"haarcascade_frontalface_default.xml")
+    _hog=cv2.HOGDescriptor(); _hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+    _tmp=os.path.join(CACHE,"_ac.png")
+    def detect_cx(tsec):
+        key=f"{tsec:.2f}"
+        if key in ac_cache: return ac_cache[key]
+        cx=None
+        try:
+            subprocess.run(["ffmpeg","-v","error","-y","-ss",str(tsec),"-i",SRC,"-frames:v","1",
+                "-vf","scale=640:-2",_tmp],check=False)
+            img=cv2.imread(_tmp)
+            if img is not None:
+                w=img.shape[1]; gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+                boxes=_face.detectMultiScale(gray,1.1,5,minSize=(40,40))
+                if len(boxes)==0:
+                    rects,_=_hog.detectMultiScale(img,winStride=(8,8))
+                    boxes=rects
+                if len(boxes):
+                    bx,by,bw,bh=max(boxes,key=lambda r:r[2]*r[3])
+                    cx=round((bx+bw/2)/w,3)
+        except Exception: cx=None
+        ac_cache[key]=cx; return cx
+    print("  auto-center: detecting subjects…")
+
+cuts=[]; ac_hits=0
 for idx,((s0,slen),a) in enumerate(zip(slots,assigned)):
-    sec,cx0,cx1,is_pan=a
+    sec,cx0,cx1,is_pan,manual=a
+    if AUTOCENTER and not manual and not is_pan:   # detection fills only unset shots
+        dcx=detect_cx(float(min(sec,max(0.0,DUR-slen))))
+        if dcx is not None: cx0=cx1=clip01(dcx); ac_hits+=1
     if PAN>0 and not is_pan:                 # gentle auto-drift around the center
         d=1 if idx%2==0 else -1
         cx0,cx1=clip01(cx0 - d*PAN/2), clip01(cx1 + d*PAN/2)
     s=float(min(sec,max(0.0,DUR-slen)))
-    cuts.append({"src_start":round(s,3),"dur":round(slen,3),
+    cuts.append({"src_start":round(s,3),"dur":round(slen,3),"slow":1.0,
                  "crop_x0":round(cx0,3),"crop_x1":round(cx1,3),
                  "excite":round(float(exc[int(min(sec,NS-1))]),3)})
+if AUTOCENTER:
+    try: json.dump(ac_cache,open(acpath,"w"))
+    except Exception: pass
+    print(f"  auto-center: framed {ac_hits}/{len(cuts)} shots on a detected subject")
+
+# ---- slow-mo: mark N evenly-spaced shots to play slowed (beat-preserving) ---
+SLOWMO=int(float(os.environ.get("SLOWMO") or 0))
+SLOWMO_RATE=float(os.environ.get("SLOWMO_RATE") or 2)
+if SLOWMO>0 and len(cuts)>0:
+    n=min(SLOWMO,len(cuts))
+    idxs={int(round((k+0.5)*len(cuts)/n)) for k in range(n)}
+    for j in idxs:
+        j=min(j,len(cuts)-1); cuts[j]["slow"]=SLOWMO_RATE
+    print(f"  slow-mo: {len(idxs)} shot(s) at {SLOWMO_RATE:g}x")
 
 OVL=os.environ.get("OVERLAY","")
 overlay_meta=None
@@ -285,8 +382,14 @@ if LOOK_SCOPE not in ("footage","all"): LOOK_SCOPE="footage"
 if LOOK or FILTER_RAW: print(f"  look: {FILTER_RAW or LOOK} (scope: {LOOK_SCOPE})")
 if PAN>0: print(f"  auto-pan: ±{PAN/2:.2f} around each shot")
 
+FPS=int(float(os.environ.get("FPS") or 30))
+SHAKE=float(os.environ.get("SHAKE") or 0)
+LOOK_INT=float(os.environ.get("LOOK_INTENSITY") or 1)
+if FPS!=30: print(f"  frame rate: {FPS} fps")
+if SHAKE>0: print(f"  camera shake: {SHAKE:g}px")
 plan={"source":os.path.abspath(SRC),"audio":audio_meta,"overlay":overlay_meta,
-      "look":(LOOK or None),"filter":(FILTER_RAW or None),"look_scope":LOOK_SCOPE,"tempo":round(tempo,1),
+      "look":(LOOK or None),"filter":(FILTER_RAW or None),"look_scope":LOOK_SCOPE,
+      "look_intensity":LOOK_INT,"fps":FPS,"shake":SHAKE,"tempo":round(tempo,1),
       "reel_seconds":round(grid_end-grid_start,3),"n_cuts":len(cuts),"cuts":cuts}
 json.dump(plan,open(PLAN,"w"),indent=2)
 print(f"  wrote {PLAN}: {len(cuts)} cuts, {plan['reel_seconds']:.1f}s reel"
@@ -390,30 +493,52 @@ cmd_cut(){
 import os,json
 p=json.load(open(os.environ["PLAN"])); cuts=p["cuts"]; a=p["audio"]; ov=p.get("overlay")
 src=os.environ["SRC"]; parts=[]; labels=""; idx=1
+FPS=int(p.get("fps",30)); SH=float(p.get("shake",0))
 a_idx=0
 if a["file"]: a_idx=idx; idx+=1
 o_idx=None
 if ov: o_idx=idx; idx+=1
 for i,c in enumerate(cuts):
-    s=c["src_start"]; e=s+c["dur"]; dur=max(0.05,c["dur"])
+    dur=max(0.05,c["dur"]); slow=float(c.get("slow",1))
+    s=c["src_start"]; e=s+dur/slow                 # slow-mo: grab less source, stretch to fill slot
     c0=c.get("crop_x0", c.get("crop_x",0.5)); c1=c.get("crop_x1", c0)
-    # per-clip: trim -> scale to cover -> crop with a (possibly time-varying)
-    # horizontal offset that pans c0->c1 across the shot -> normalize SAR.
-    # t runs 0..dur within the clip (setpts reset), so no clamp needed.
-    xexpr=f"(iw-1080)*({c0}+{(c1-c0):.5f}*t/{dur})"
-    parts.append(f"[0:v]trim=start={s}:end={e},setpts=PTS-STARTPTS,"
-                 f"scale=1080:1920:force_original_aspect_ratio=increase,"
-                 f"crop=1080:1920:{xexpr}:0,setsar=1[v{i}];")
-    labels+=f"[v{i}]"
+    chain=f"[0:v]trim=start={s}:end={e},setpts={slow:g}*(PTS-STARTPTS)"
+    if SH>0:
+        # scale with headroom, then crop 1080x1920 with a pan + handheld shake
+        ph=i*1.7
+        sy=f"{SH:g}+{SH:g}*(0.6*sin(2*PI*6.5*t+{ph:.2f})+0.4*sin(2*PI*3.1*t))"
+        sx=f"{0.5*SH:g}*sin(2*PI*4.7*t+{ph:.2f})"
+        xexpr=f"(iw-{1080})*({c0}+{(c1-c0):.5f}*t/{dur})+{sx}"
+        chain+=(f",scale={1080+2*int(SH)}:{1920+2*int(SH)}:force_original_aspect_ratio=increase,"
+                f"crop=1080:1920:{xexpr}:{sy},setsar=1[v{i}];")
+    else:
+        xexpr=f"(iw-1080)*({c0}+{(c1-c0):.5f}*t/{dur})"
+        chain+=(",scale=1080:1920:force_original_aspect_ratio=increase,"
+                f"crop=1080:1920:{xexpr}:0,setsar=1[v{i}];")
+    parts.append(chain); labels+=f"[v{i}]"
 parts.append(f"{labels}concat=n={len(cuts)}:v=1:a=0[vc];")
-parts.append("[vc]fps=30,format=yuv420p[vbase0];")
-# creative look / filter, applied to the footage (before any overlay)
-LOOKS={"bw":"hue=s=0","punch":"eq=contrast=1.12:saturation=1.35:brightness=0.02",
-       "warm":"colorbalance=rs=0.06:gs=0.02:bs=-0.06,eq=saturation=1.12",
-       "cool":"colorbalance=rs=-0.06:bs=0.08","vignette":"vignette=PI/4.5",
-       "dramatic":"eq=contrast=1.25:saturation=0.85,vignette=PI/4.5",
-       "film":"curves=preset=medium_contrast,eq=saturation=1.05,vignette=PI/5,noise=alls=6:allf=t",
-       "vhs":"eq=saturation=1.25:contrast=1.05,rgbashift=rh=3:bh=-3,noise=alls=10:allf=t"}
+parts.append(f"[vc]fps={FPS},format=yuv420p[vbase0];")
+# creative look / filter, applied to the footage (before any overlay).
+# LOOKS are functions of intensity k so LOOK_INTENSITY can push them harder.
+k=float(p.get("look_intensity",1))
+def _looks(k):
+    ci=lambda base,amt:round(base+amt*k,3)   # scale an effect by intensity
+    ni=lambda amt:int(round(amt*k))
+    return {
+      "bw":"hue=s=0",
+      "punch":f"eq=contrast={ci(1,0.12)}:saturation={ci(1,0.35)}:brightness={ci(0,0.02)}",
+      "warm":f"colorbalance=rs={ci(0,0.06)}:gs={ci(0,0.02)}:bs={ci(0,-0.06)},eq=saturation={ci(1,0.12)}",
+      "cool":f"colorbalance=rs={ci(0,-0.06)}:bs={ci(0,0.08)}",
+      "vignette":f"vignette=PI/{max(3.0,5-1.2*k):.2f}",
+      "dramatic":f"eq=contrast={ci(1,0.25)}:saturation={max(0.2,1-0.15*k)},vignette=PI/{max(3.0,5-1.0*k):.2f}",
+      "film":f"curves=preset=medium_contrast,eq=saturation={ci(1,0.05)},vignette=PI/5,noise=alls={ni(7)}:allf=t",
+      # beefier VHS: chroma bleed, tape noise, luma smear, softening, vignette
+      "vhs":(f"eq=saturation={ci(1,0.45)}:contrast={ci(1,0.08)}:brightness={ci(0,0.02)},"
+             f"rgbashift=rh={ni(7)}:bh={ni(-7)}:bv={ni(4)}:gh={ni(-3)},"
+             f"gblur=sigma={ci(0.3,0.5)},noise=alls={ni(18)}:allf=t+u,"
+             f"curves=b='0/0.05 1/0.92':r='0/0.03 1/0.98',vignette=PI/{max(3.5,5-0.8*k):.2f}"),
+    }
+LOOKS=_looks(k)
 look_chain=p.get("filter") or (LOOKS.get(p.get("look",""),"") if p.get("look") else "")
 scope=(p.get("look_scope") or "footage")   # "footage" (before overlay) or "all" (whole composite)
 if look_chain and scope=="footage":
@@ -436,7 +561,7 @@ if ov:
         dur=p["reel_seconds"]+1
         # bake overlay over black, then blend in RGB (gbrp) so chroma is preserved
         # where the overlay is transparent; YUV blending would grey the whole frame.
-        parts.append(f"color=c=black:s=1080x1920:r=30:d={dur},format=rgba[obg];")
+        parts.append(f"color=c=black:s=1080x1920:r={FPS}:d={dur},format=rgba[obg];")
         parts.append("[obg][ov]overlay=0:0:format=auto:shortest=1,format=gbrp[ovflat];")
         parts.append("[vbase]format=gbrp[vrgb];")
         parts.append(f"[vrgb][ovflat]blend=all_mode={blend}:shortest=1,format=yuv420p[vout];")
@@ -474,12 +599,13 @@ PY
     -c:v libx264 -preset medium -b:v "$VIDEO_BITRATE" -maxrate "$VIDEO_BITRATE" -bufsize 16M \
     -profile:v high -level 4.0 -c:a aac -b:a 128k -ar 48000 -movflags +faststart \
     "$OUT_DIR/reel.mp4"
-  local d sz
+  local d sz ofps
   d="$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$OUT_DIR/reel.mp4")"
   sz="$(du -h "$OUT_DIR/reel.mp4" | awk '{print $1}')"
+  ofps="$(python3 -c "import json;print(json.load(open('$PLAN')).get('fps',30))")"
   ok "Done."
-  printf "\n%sFinal Reel:%s %s/reel.mp4\n  duration : %.2f s\n  size     : %s\n  format   : 1080x1920, H.264 high, AAC 128k, 30fps, %s cuts\n" \
-    "$BOLD" "$RST" "$OUT_DIR" "$d" "$sz" "$ncuts"
+  printf "\n%sFinal Reel:%s %s/reel.mp4\n  duration : %.2f s\n  size     : %s\n  format   : 1080x1920, H.264 high, AAC 128k, %sfps, %s cuts\n" \
+    "$BOLD" "$RST" "$OUT_DIR" "$d" "$sz" "$ofps" "$ncuts"
 }
 
 case "${1:-}" in

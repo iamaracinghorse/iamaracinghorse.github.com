@@ -5,3 +5,4 @@ frames/
 plan.json
 picks.txt
 .reel-venv/
+.reel-cache/

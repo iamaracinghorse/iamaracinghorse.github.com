@@ -1,47 +1,45 @@
 # picks.txt — curated shot list for the Reel (make-reel.sh)
-# format: TS [FRAME]   FRAME = crop center 0..1 (0=left .5=center 1=right),
-#                      or a pan like 0.3>0.7 that slides across the shot.
+# format: TS [FRAME]   FRAME = crop center 0..1, or a pan like 0.3>0.7.
 #
-# Tuned for BEATS_PER_CUT=3 (~30 cuts). Performer shots are pulled from the
-# EARLIER part of the show (better camera variety, far less bassist-cam);
-# crowd shots come from anywhere (a wide crowd shot doesn't over-feature the
-# bassist). Bassist (black tee/white bass) is down to a single shot. Crowd is
-# heavy and starts at cut 2. crop centers are eyeballed from the contact sheets
-# to keep subjects framed; pair with PAN=0.15 for gentle motion.
+# Tuned for BEATS_PER_CUT=3. Crowd-heavy (opens on a crowd shot, ~11 crowd
+# shots spread through, never adjacent). Performer shots are pulled from the
+# EARLIER part of the show for camera variety / far less bassist-cam; bassist
+# is a single shot. NOTE: picks are read at PREP time — after editing, re-run
+# prep -> cut. (If AUTOCENTER=1, unset crop values are auto-detected.)
 
-0:08   0.6    # guitarist (subject right)
-2:16          # CROWD  <- early
-6:25   0.4    # singer (green), screaming (face left)
-0:36          # drummer
+2:16          # CROWD  <- open on the crowd
+0:08   0.6    # guitarist
+6:25   0.4    # singer (green)
 5:16          # CROWD
+0:36          # drummer
 24:40         # guitarist
-7:40          # singer (green)
 9:12          # CROWD
+7:40          # singer (green)
 11:45         # drummer
-18:57  0.55   # guitarist
 13:56         # CROWD
+18:57  0.55   # guitarist
 25:19         # singer (green), arm raised
-27:07         # guitarist
 17:58         # CROWD (red wash)
+27:07         # guitarist
 15:00         # drummer
-4:21          # guitarist
 23:08         # CROWD
-45:19         # bassist (the only one)
+41:35  0.4    # singer (green), profile
 45:03         # << your locked-in moment
 46:35         # CROWD (audience visible)
-27:00  0.6    # guitarist (bent, right)
-15:17  0.4    # singer (green) (face left)
-56:57         # CROWD (hands up)
-23:59         # drummer, arms up
-5:10   0.3>0.7 # two guitarists — pan across them
+4:21          # guitarist
 40:03         # CROWD (house lights)
-25:11  0.4    # singer (green), leaning
-28:22         # guitarist (motion blur)
+53:04         # singer (green)
+56:57         # CROWD (hands up)
+45:19         # bassist (the only one)
+48:10         # guitarist, smiling
 46:26         # CROWD
-4:06   0.55   # singer (green)
+25:11  0.4    # singer (green), leaning
+5:10   0.3>0.7 # two guitarists — pan across them
+56:29         # CROWD
+23:59         # drummer, arms up
 
 # --- buffer (used only if the tempo yields more/shorter cuts) ---
 1:01:44        # CROWD (finale)
-27:51  0.45   # guitarist
-56:29          # CROWD
-3:19           # two performers
+27:00  0.6    # guitarist
+1:02:03        # CROWD (finale wide)
+15:17  0.4    # singer (green)
