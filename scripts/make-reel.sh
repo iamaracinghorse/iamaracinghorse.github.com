@@ -99,6 +99,7 @@ ensure_venv(){
 ensure_cv(){  # OpenCV (pinned to 4.x — v5 dropped the classic detectors), for AUTOCENTER
   if ! python -c "import cv2; cv2.CascadeClassifier" >/dev/null 2>&1; then
     say "Installing OpenCV for auto-centering (~40MB wheel, first run only) — Python $(python -c 'import sys;print(".".join(map(str,sys.version_info[:2])))')"
+    pip install -q --upgrade pip >/dev/null 2>&1   # old pip can miss the wheel tag -> source build
     # --only-binary so pip never silently BUILDS FROM SOURCE (that's the hang);
     # it downloads a wheel fast, or fails fast if none exists for this Python.
     pip install --progress-bar on --only-binary=:all: "opencv-python-headless>=4.8,<5" \
