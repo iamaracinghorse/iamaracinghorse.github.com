@@ -98,8 +98,10 @@ ensure_venv(){
 }
 ensure_cv(){  # OpenCV (pinned to 4.x — v5 dropped the classic detectors), for AUTOCENTER
   if ! python -c "import cv2; cv2.CascadeClassifier" >/dev/null 2>&1; then
-    say "Installing OpenCV for auto-centering (first run only) ..."
-    pip install -q "opencv-python-headless>=4.8,<5"
+    say "Installing OpenCV for auto-centering (~40MB wheel, first run only; progress below) ..."
+    # NOT quiet, so the download shows a progress bar instead of looking hung
+    pip install --progress-bar on "opencv-python-headless>=4.8,<5" \
+      || warn "OpenCV install failed — auto-center will be skipped, the rest still runs."
   fi
 }
 find_source(){ ls -1 "$SOURCE_DIR"/video.* 2>/dev/null | grep -viE '\.(part|ytdl)$' | head -1; }
@@ -307,13 +309,17 @@ if free:
 AUTOCENTER=os.environ.get("AUTOCENTER")=="1"
 ac_cache={}
 if AUTOCENTER:
+    try:
+        import cv2
+        _face=cv2.CascadeClassifier(cv2.data.haarcascades+"haarcascade_frontalface_default.xml")
+        _hog=cv2.HOGDescriptor(); _hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+    except Exception as e:
+        print(f"  auto-center: OpenCV unavailable ({e}) — using center crops"); AUTOCENTER=False
+if AUTOCENTER:
     acpath=os.path.join(CACHE,"autocenter_"+ckey(os.path.abspath(SRC),mtime(SRC))+".json")
     if os.path.exists(acpath):
         try: ac_cache=json.load(open(acpath))
         except Exception: ac_cache={}
-    import cv2
-    _face=cv2.CascadeClassifier(cv2.data.haarcascades+"haarcascade_frontalface_default.xml")
-    _hog=cv2.HOGDescriptor(); _hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
     _tmp=os.path.join(CACHE,"_ac.png")
     def detect_cx(tsec):
         key=f"{tsec:.2f}"
