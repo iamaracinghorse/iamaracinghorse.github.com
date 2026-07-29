@@ -247,7 +247,7 @@ import re, bisect
 SNAP=os.environ.get("SNAP_CUTS","1")!="0"
 src_cuts=[]
 if SNAP:
-    SCTH=float(os.environ.get("SCENE_THRESHOLD") or 0.3)
+    SCTH=float(os.environ.get("SCENE_THRESHOLD") or 0.2)   # lower = catch more cuts
     scpath=os.path.join(CACHE,ckey("scenes",os.path.abspath(SRC),mtime(SRC),SCTH)+".npz")
     if os.path.exists(scpath):
         src_cuts=list(np.load(scpath)["cuts"]); print(f"  source shots: cached ({len(src_cuts)+1})")
@@ -260,21 +260,25 @@ if SNAP:
         src_cuts=sorted(set(round(float(m),3) for m in re.findall(r"pts_time:([0-9.]+)",err)))
         np.savez(scpath,cuts=np.array(src_cuts)); print(f"  source shots: {len(src_cuts)+1} detected")
 _bounds=[0.0]+[c for c in src_cuts if 0<c<DUR]+[DUR]
+if SNAP and len(_bounds)>2:
+    _sl=np.diff(_bounds); print(f"    (median shot {np.median(_sl):.2f}s, shortest {_sl.min():.2f}s)")
 def shot_of(t):
     i=max(0,min(bisect.bisect_right(_bounds,t)-1,len(_bounds)-2)); return _bounds[i],_bounds[i+1]
+snap_stats={"clean":0,"hop":0,"slow":0}
 def snap(sec,D):
-    """Return (start,slow) placing a D-second clip inside one source shot."""
+    """Return (start,slow) so a D-second clip stays inside ONE source shot (never straddles a cut)."""
     if not SNAP: return sec,1.0
     a,b=shot_of(sec); L=b-a
-    if L>=D:            return min(max(sec,a),b-D),1.0            # fits: keep inside
-    if L>=D*0.6:        return a,round(D/max(L,0.08),3)           # a bit short: mild slow to fill
-    # too short: hop to the nearest shot long enough to hold D
+    if L>=D: snap_stats["clean"]+=1; return min(max(sec,a),b-D),1.0     # fits cleanly inside
+    # shot too short: prefer hopping to the nearest shot long enough to hold D
     best=None
     for a2,b2 in zip(_bounds,_bounds[1:]):
-        if b2-a2>=D and abs((a2+b2)/2-sec)<6:
+        if b2-a2>=D and abs((a2+b2)/2-sec)<20:
             if best is None or abs((a2+b2)/2-sec)<abs(sum(best)/2-sec): best=(a2,b2)
-    if best: return min(max(sec,best[0]),best[1]-D),1.0
-    return a,round(min(3.0,D/max(L,0.08)),3)
+    if best: snap_stats["hop"]+=1; return min(max(sec,best[0]),best[1]-D),1.0
+    # nothing long enough nearby: play the WHOLE short shot, slowed to fill the
+    # slot (uncapped) — a slow micro-clip, but it NEVER crosses a cut.
+    snap_stats["slow"]+=1; return a,round(D/max(L,0.05),3)
 
 # ---- parse picks.txt -------------------------------------------------------
 # per line: TS [FRAME] [Nb]  — FRAME=crop center 0..1 or pan a>b; Nb=beats long
@@ -375,6 +379,9 @@ for idx,((s0,slen),a) in enumerate(zip(slots,assigned)):
     cuts.append({"src_start":round(start,3),"dur":round(slen,3),"slow":slow,
                  "crop_x0":round(cx0,3),"crop_x1":round(cx1,3),
                  "excite":round(float(exc[int(min(sec,NS-1))]),3)})
+if SNAP:
+    print(f"  shot-fit: {snap_stats['clean']} clean, {snap_stats['hop']} hopped to a longer shot, "
+          f"{snap_stats['slow']} slowed-to-fill (of {len(cuts)} cuts)")
 if AUTOCENTER:
     try: json.dump(ac_cache,open(acpath,"w"))
     except Exception: pass
