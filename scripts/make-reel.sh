@@ -37,10 +37,12 @@
 # number of beats per cut (e.g. BEATS_PER_CUT=2) and overrides CUT_SECONDS.
 #
 # Framing / motion:
-#   * picks.txt CROP_X can be a single center (0.6) OR a pan "0.3>0.7" that
-#     slides the crop across the shot (great for horizontal->vertical footage).
-#   * PAN=0.2 adds a gentle auto-drift around each shot's center (alternating
-#     direction) for subtle life on otherwise-static crops.
+#   * picks.txt line: TS [FRAME] [Nb]  — FRAME is a crop center (0.6) or a pan
+#     "0.3>0.7"; "Nb" makes that shot N beats long (e.g. 3b = a longer hold).
+#   * PAN=0.2 adds a gentle auto-drift around each shot's center.
+#   * SNAP_CUTS=1 (default) detects the SOURCE video's own cuts and keeps every
+#     clip inside a single source shot (no clip straddles an original cut).
+#     SNAP_CUTS=0 disables it; SCENE_THRESHOLD=0.3 tunes cut sensitivity.
 #
 # Creative look: LOOK=<preset> or FILTER="<raw ffmpeg filter chain>".
 #   presets: bw punch warm cool vignette dramatic film vhs
@@ -207,24 +209,12 @@ else:
              meta=np.array(audio_meta,dtype=object),aud_sec=aud_sec)
 print(f"  tempo: {tempo:.1f} BPM")
 
-# beats within the grid; build cut boundaries (optionally length-jittered on-beat)
 gb=[b for b in beats if grid_start-1e-6<=b<=grid_end+1e-6] or [grid_start,grid_end]
 beat_dur=60.0/tempo
 _bpc_env=os.environ.get("BEATS_PER_CUT","").strip()
 bpc=int(_bpc_env) if _bpc_env else max(1,int(round(CUTLEN/beat_dur)))
 JIT=float(os.environ.get("LENGTH_JITTER") or 0)   # 0..1 chance a cut gets ±1 beat
-if JIT>0 and len(gb)>bpc+1:
-    bounds=[gb[0]]; i=0
-    while i<len(gb)-1:
-        step=bpc+(int(rng.choice([-1,1])) if rng.random()<JIT else 0)
-        step=max(1,step); i=min(i+step,len(gb)-1); bounds.append(gb[i])
-else:
-    bounds=list(gb[::bpc])
-if bounds[-1]<grid_end-1e-3: bounds.append(grid_end)
-slots=[(bounds[i]-grid_start,bounds[i+1]-bounds[i]) for i in range(len(bounds)-1)]
-slots=[(a,b) for a,b in slots if b>0.05]
-nslots=len(slots)
-print(f"  audio bed span: {grid_end-grid_start:.1f}s, cuts: {nslots} ({bpc} beat/cut{', jittered' if JIT>0 else ''})")
+print(f"  audio bed span: {grid_end-grid_start:.1f}s, {bpc} beat/cut{', jittered' if JIT>0 else ''}")
 
 # ---- motion + frame signatures across the whole video (cached on source) ---
 mkey=ckey("mot2",os.path.abspath(SRC),mtime(SRC),AFPS,int(DUR))
@@ -251,8 +241,43 @@ else:
     ae=np.zeros(NS)
 exc=0.6*norm(mot)+0.4*norm(ae)
 
+# ---- source shot boundaries: detect the ORIGINAL edit's cuts (cached) ------
+# so a grabbed clip never straddles one of the source video's own cuts.
+import re, bisect
+SNAP=os.environ.get("SNAP_CUTS","1")!="0"
+src_cuts=[]
+if SNAP:
+    SCTH=float(os.environ.get("SCENE_THRESHOLD") or 0.3)
+    scpath=os.path.join(CACHE,ckey("scenes",os.path.abspath(SRC),mtime(SRC),SCTH)+".npz")
+    if os.path.exists(scpath):
+        src_cuts=list(np.load(scpath)["cuts"]); print(f"  source shots: cached ({len(src_cuts)+1})")
+    else:
+        print("  detecting the source video's own cuts…")
+        # NB: showinfo logs at info level, so we must NOT use -v error here
+        err=subprocess.run(["ffmpeg","-hide_banner","-loglevel","info","-i",SRC,"-vf",
+            f"select='gt(scene,{SCTH})',showinfo","-an","-f","null","-"],
+            capture_output=True,text=True).stderr
+        src_cuts=sorted(set(round(float(m),3) for m in re.findall(r"pts_time:([0-9.]+)",err)))
+        np.savez(scpath,cuts=np.array(src_cuts)); print(f"  source shots: {len(src_cuts)+1} detected")
+_bounds=[0.0]+[c for c in src_cuts if 0<c<DUR]+[DUR]
+def shot_of(t):
+    i=max(0,min(bisect.bisect_right(_bounds,t)-1,len(_bounds)-2)); return _bounds[i],_bounds[i+1]
+def snap(sec,D):
+    """Return (start,slow) placing a D-second clip inside one source shot."""
+    if not SNAP: return sec,1.0
+    a,b=shot_of(sec); L=b-a
+    if L>=D:            return min(max(sec,a),b-D),1.0            # fits: keep inside
+    if L>=D*0.6:        return a,round(D/max(L,0.08),3)           # a bit short: mild slow to fill
+    # too short: hop to the nearest shot long enough to hold D
+    best=None
+    for a2,b2 in zip(_bounds,_bounds[1:]):
+        if b2-a2>=D and abs((a2+b2)/2-sec)<6:
+            if best is None or abs((a2+b2)/2-sec)<abs(sum(best)/2-sec): best=(a2,b2)
+    if best: return min(max(sec,best[0]),best[1]-D),1.0
+    return a,round(min(3.0,D/max(L,0.08)),3)
+
 # ---- parse picks.txt -------------------------------------------------------
-# frame field: "0.6" static crop center, or "0.3>0.7" pan from left->right.
+# per line: TS [FRAME] [Nb]  — FRAME=crop center 0..1 or pan a>b; Nb=beats long
 PAN=float(os.environ.get("PAN") or 0)
 def clip01(v): return max(0.0,min(1.0,v))
 picks=[]
@@ -260,52 +285,44 @@ if os.path.exists(PICKS):
     for ln in open(PICKS):
         ln=ln.split("#")[0].strip()
         if not ln: continue
-        parts=ln.split()
-        t=ts2s(parts[0]); manual=len(parts)>1
-        if len(parts)>1 and ">" in parts[1]:
-            a,b=parts[1].split(">"); cx0,cx1,is_pan=clip01(float(a)),clip01(float(b)),True
-        elif len(parts)>1:
-            cx0=cx1=clip01(float(parts[1])); is_pan=False
-        else:
-            cx0=cx1=0.5; is_pan=False
-        picks.append((t,cx0,cx1,is_pan,manual))
+        parts=ln.split(); t=ts2s(parts[0])
+        cx0=cx1=0.5; is_pan=False; manual=False; nbeats=None
+        for tok in parts[1:]:
+            if tok[-1:].lower()=="b" and tok[:-1].replace(".","",1).isdigit():
+                nbeats=max(1,int(float(tok[:-1])))
+            elif ">" in tok:
+                a,b=tok.split(">"); cx0,cx1,is_pan,manual=clip01(float(a)),clip01(float(b)),True,True
+            else:
+                try: cx0=cx1=clip01(float(tok)); manual=True
+                except Exception: pass
+        picks.append((t,cx0,cx1,is_pan,manual,nbeats))
     print(f"  picks.txt: {len(picks)} curated moment(s)")
 
-# ---- choose a source moment (sec) + crop_x for every slot ------------------
-assigned=[None]*nslots
-used=[]
-if picks:
-    if len(picks)>=nslots:
-        # enough curated moments to fill every slot: use them IN ORDER
-        for i in range(nslots): assigned[i]=picks[i]; used.append(int(picks[i][0]))
-    else:
-        # fewer picks than slots: spread them evenly (order-preserving), auto-fill gaps
-        npk=len(picks)
-        for i in range(npk):
-            idx=(i*nslots)//npk
-            while assigned[idx] is not None: idx=(idx+1)%nslots
-            assigned[idx]=picks[i]; used.append(int(picks[i][0]))
-# auto-fill remaining slots: farthest-point on signatures, weighted by excite
-free=[i for i in range(nslots) if assigned[i] is None]
-if free:
-    MINGAP=max(2,int(CUTLEN*2))
-    cand=[s for s in np.argsort(-exc) if all(abs(s-u)>=MINGAP for u in used)]
-    chosen=[]
-    if cand:
-        chosen.append(cand[0])
-        while len(chosen)<len(free) and len(chosen)<len(cand):
-            best,bscore=None,-1
-            for s in cand:
-                if s in chosen: continue
-                dmin=min(np.linalg.norm(sig[s]-sig[c]) for c in chosen)
-                sc=0.5*exc[s]+0.5*(dmin/(np.linalg.norm(sig).mean()+1e-6))
-                if sc>bscore: best,bscore=s,sc
-            if best is None: break
-            chosen.append(best)
-    i=0
-    while len(chosen)<len(free): chosen.append(int((cand or [0])[i%len(cand or [0])])); i+=1
-    order=sorted(zip(free,sorted(chosen[:len(free)])))
-    for slot_i,sec in order: assigned[slot_i]=(float(sec),0.5,0.5,False,False)
+# ---- walk the beat grid, consuming picks in order (per-pick length), then
+#      auto-fill the tail; each entry claims a whole number of beats ----------
+Dtyp=bpc*beat_dur
+def nbeats_default():
+    nb=bpc
+    if JIT>0 and rng.random()<JIT: nb=max(1,nb+int(rng.choice([-1,1])))
+    return nb
+slots=[]; assigned=[]; gi=0; pi=0
+while gi<len(gb)-1 and pi<len(picks):
+    pk=picks[pi]; pi+=1
+    nb=pk[5] if pk[5] else nbeats_default()
+    gi2=min(gi+nb,len(gb)-1)
+    slots.append((gb[gi]-grid_start,gb[gi2]-gb[gi])); assigned.append(pk[:5]); gi=gi2
+if gi<len(gb)-1:   # auto-fill remaining beats with exciting, spaced, full-shot moments
+    used=[int(p[0]) for p in picks[:pi]]
+    MINGAP=max(2,int(Dtyp*2))
+    cand=[int(s) for s in np.argsort(-exc)
+          if all(abs(s-u)>=MINGAP for u in used) and (not SNAP or (shot_of(s)[1]-shot_of(s)[0])>=0.8*Dtyp)]
+    ci=0
+    while gi<len(gb)-1:
+        nb=nbeats_default(); gi2=min(gi+nb,len(gb)-1)
+        sec=cand[ci] if ci<len(cand) else int(np.argmax(exc)); ci+=1
+        slots.append((gb[gi]-grid_start,gb[gi2]-gb[gi])); assigned.append((float(sec),0.5,0.5,False,False)); gi=gi2
+nslots=len(slots)
+print(f"  cuts: {nslots}{' (shot-snapped)' if SNAP else ''}")
 
 # ---- optional auto-center: detect the main subject per shot (OpenCV) -------
 AUTOCENTER=os.environ.get("AUTOCENTER")=="1"
@@ -347,14 +364,15 @@ if AUTOCENTER:
 cuts=[]; ac_hits=0
 for idx,((s0,slen),a) in enumerate(zip(slots,assigned)):
     sec,cx0,cx1,is_pan,manual=a
-    if AUTOCENTER and not manual and not is_pan:   # detection fills only unset shots
-        dcx=detect_cx(float(min(sec,max(0.0,DUR-slen))))
+    start,slow=snap(float(sec),slen)                 # keep the clip inside one source shot
+    start=float(min(max(0.0,start),max(0.0,DUR-slen/max(slow,1))))
+    if AUTOCENTER and not manual and not is_pan:      # detect on the frame we'll actually show
+        dcx=detect_cx(start)
         if dcx is not None: cx0=cx1=clip01(dcx); ac_hits+=1
     if PAN>0 and not is_pan:                 # gentle auto-drift around the center
         d=1 if idx%2==0 else -1
         cx0,cx1=clip01(cx0 - d*PAN/2), clip01(cx1 + d*PAN/2)
-    s=float(min(sec,max(0.0,DUR-slen)))
-    cuts.append({"src_start":round(s,3),"dur":round(slen,3),"slow":1.0,
+    cuts.append({"src_start":round(start,3),"dur":round(slen,3),"slow":slow,
                  "crop_x0":round(cx0,3),"crop_x1":round(cx1,3),
                  "excite":round(float(exc[int(min(sec,NS-1))]),3)})
 if AUTOCENTER:
@@ -369,7 +387,7 @@ if SLOWMO>0 and len(cuts)>0:
     n=min(SLOWMO,len(cuts))
     idxs={int(round((k+0.5)*len(cuts)/n)) for k in range(n)}
     for j in idxs:
-        j=min(j,len(cuts)-1); cuts[j]["slow"]=SLOWMO_RATE
+        j=min(j,len(cuts)-1); cuts[j]["slow"]=max(cuts[j]["slow"],SLOWMO_RATE)  # keep shot-fit slow if larger
     print(f"  slow-mo: {len(idxs)} shot(s) at {SLOWMO_RATE:g}x")
 
 OVL=os.environ.get("OVERLAY","")
