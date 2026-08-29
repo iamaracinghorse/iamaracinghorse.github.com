@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#05070d">
+  <title>Edge of the Empire — GM Flash Cards</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #05070d;
+      --panel: #0d1220;
+      --panel-2: #141b2e;
+      --line: rgba(255, 255, 255, 0.09);
+      --line-strong: rgba(255, 255, 255, 0.18);
+      --text: #e6ecf5;
+      --dim: rgba(230, 236, 245, 0.55);
+      --dimmer: rgba(230, 236, 245, 0.35);
+      --accent: #38bdf8;
+      --good: #34d399;
+      --bad: #f87171;
+      --radius: 14px;
+    }
+
+    html { -webkit-text-size-adjust: 100%; }
+
+    body {
+      font-family: 'Helvetica Neue', Helvetica, system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      padding: 0 16px calc(40px + env(safe-area-inset-bottom));
+      background-image:
+        radial-gradient(1100px 520px at 50% -12%, rgba(56, 189, 248, 0.10), transparent 70%),
+        radial-gradient(700px 400px at 12% 105%, rgba(167, 139, 250, 0.07), transparent 70%);
+    }
+
+    .wrap { max-width: 940px; margin: 0 auto; }
+
+    /* ── Header ───────────────────────────────────────── */
+    header {
+      padding: 28px 0 20px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .brand h1 {
+      font-size: clamp(1.35rem, 4.2vw, 1.9rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+
+    .brand .kicker {
+      font-size: 0.68rem;
+      letter-spacing: 0.19em;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .brand p { color: var(--dim); font-size: 0.86rem; margin-top: 5px; }
+
+    /* ── Buttons ──────────────────────────────────────── */
+    button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+
+    .btn {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 15px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      transition: border-color .15s, background .15s, transform .08s;
+      white-space: nowrap;
+    }
+
+    .btn:hover { border-color: var(--line-strong); background: #1a2338; }
+    .btn:active { transform: translateY(1px); }
+    .btn.ghost { background: transparent; }
+    .btn.small { padding: 6px 11px; font-size: 0.78rem; }
+
+    .btn.primary {
+      background: var(--accent);
+      color: #04121c;
+      border-color: transparent;
+      font-weight: 700;
+    }
+
+    .btn.primary:hover { background: #7dd3fc; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── Setup: topic tiles ───────────────────────────── */
+    .section-label {
+      font-size: 0.68rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--dimmer);
+      font-weight: 700;
+      margin: 26px 0 11px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+    .topics {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+      gap: 10px;
+    }
+
+    .topic {
+      position: relative;
+      text-align: left;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 13px 14px 12px;
+      overflow: hidden;
+      transition: border-color .15s, background .15s;
+    }
+
+    .topic::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: var(--tc);
+      opacity: .5;
+      transition: opacity .15s;
+    }
+
+    .topic:hover { border-color: var(--line-strong); }
+    .topic[aria-pressed="true"] { background: var(--panel-2); border-color: var(--tc); }
+    .topic[aria-pressed="true"]::before { opacity: 1; }
+
+    .topic .name {
+      font-weight: 700;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .topic .name .tick {
+      width: 15px; height: 15px;
+      border-radius: 5px;
+      border: 1.5px solid var(--line-strong);
+      flex: none;
+      display: grid;
+      place-items: center;
+      font-size: 0.6rem;
+      color: #04121c;
+    }
+
+    .topic[aria-pressed="true"] .tick { background: var(--tc); border-color: var(--tc); }
+    .topic[aria-pressed="true"] .tick::after { content: '✓'; font-weight: 900; }
+
+    .topic .blurb { color: var(--dim); font-size: 0.78rem; margin: 5px 0 9px; }
+
+    .topic .foot {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.7rem; color: var(--dimmer);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .bar { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.09); overflow: hidden; }
+    .bar i { display: block; height: 100%; background: var(--tc); border-radius: 2px; transition: width .3s; }
+
+    /* ── Chips ────────────────────────────────────────── */
+    .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+
+    .chip {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 999px;
+      padding: 6px 13px;
+      font-size: 0.79rem;
+      color: var(--dim);
+      transition: all .15s;
+      white-space: nowrap;
+    }
+
+    .chip:hover { border-color: var(--line-strong); color: var(--text); }
+    .chip[aria-pressed="true"] { background: rgba(56,189,248,.14); border-color: var(--accent); color: #bae6fd; font-weight: 600; }
+    .chip .n { opacity: .55; font-variant-numeric: tabular-nums; margin-left: 4px; }
+
+    /* ── Start bar ────────────────────────────────────── */
+    .startbar {
+      position: sticky;
+      bottom: 0;
+      margin-top: 26px;
+      padding: 13px 0 calc(13px + env(safe-area-inset-bottom));
+      background: var(--bg);
+      border-top: 1px solid var(--line);
+      margin-bottom: -1px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .startbar .count { color: var(--dim); font-size: 0.82rem; flex: 1; min-width: 150px; }
+    .startbar .count b { color: var(--text); font-variant-numeric: tabular-nums; }
+
+    /* ── Drill ────────────────────────────────────────── */
+    .drillbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 0 12px;
+      flex-wrap: wrap;
+    }
+
+    .progress { flex: 1; min-width: 120px; height: 4px; background: rgba(255,255,255,.09); border-radius: 3px; overflow: hidden; }
+    .progress i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
+
+    .meta { font-size: 0.76rem; color: var(--dimmer); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .meta b { color: var(--text); }
+    .meta .streak { color: #fbbf24; }
+
+    /* Card */
+    .card {
+      background: linear-gradient(160deg, var(--panel) 0%, #0a0f1b 100%);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--tc, var(--accent));
+      border-radius: 18px;
+      padding: 26px 24px;
+      min-height: 260px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 22px 50px -28px rgba(0, 0, 0, .95);
+    }
+
+    .card .tag {
+      font-size: 0.63rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--tc, var(--accent));
+      margin-bottom: 14px;
+      display: flex;
+      gap: 9px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .card .tag .sub {
+      color: var(--dimmer);
+      letter-spacing: .1em;
+      border-left: 1px solid var(--line);
+      padding-left: 9px;
+    }
+
+    .card .tag .boxlvl { margin-left: auto; color: var(--dimmer); letter-spacing: .08em; }
+
+    .card .body { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+
+    .q { font-size: clamp(1.05rem, 3.2vw, 1.32rem); font-weight: 600; line-height: 1.4; }
+    .q em { font-weight: 500; color: rgba(230, 236, 245, .82); }
+
+    .a {
+      margin-top: 18px;
+      padding-top: 17px;
+      border-top: 1px dashed var(--line-strong);
+      font-size: 0.98rem;
+      color: #dbe4f0;
+      animation: rise .22s ease-out;
+    }
+
+    @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+    .a .note {
+      margin-top: 12px;
+      font-size: 0.83rem;
+      color: var(--dim);
+      border-left: 2px solid var(--line-strong);
+      padding-left: 11px;
+      font-style: italic;
+    }
+
+    .hint { padding-top: 20px; color: var(--dimmer); font-size: 0.78rem; }
+    .hint kbd {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      padding: 1px 6px;
+      font-size: 0.72rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    /* Symbol chips */
+    .sym {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: color-mix(in srgb, var(--c) 15%, transparent);
+      border: 1px solid color-mix(in srgb, var(--c) 42%, transparent);
+      color: var(--c);
+      border-radius: 6px;
+      padding: 0 6px;
+      font-size: 0.82em;
+      font-weight: 600;
+      white-space: nowrap;
+      line-height: 1.55;
+    }
+
+    /* Answer buttons */
+    .grade { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+    .grade .btn { flex: 1; min-width: 132px; padding: 13px; text-align: center; }
+    .grade .miss { border-color: rgba(248,113,113,.4); color: #fca5a5; }
+    .grade .miss:hover { background: rgba(248,113,113,.12); }
+    .grade .got { border-color: rgba(52,211,153,.4); color: #6ee7b7; }
+    .grade .got:hover { background: rgba(52,211,153,.12); }
+
+    .choices { display: grid; gap: 8px; margin-top: 18px; }
+
+    .choice {
+      text-align: left;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 12px 14px;
+      font-size: 0.9rem;
+      display: flex;
+      gap: 11px;
+      align-items: flex-start;
+      transition: border-color .12s, background .12s;
+    }
+
+    .choice:hover:not(:disabled) { border-color: var(--line-strong); }
+    .choice .key {
+      font-size: 0.7rem; font-weight: 700; color: var(--dimmer);
+      border: 1px solid var(--line); border-radius: 5px;
+      padding: 0 6px; flex: none; margin-top: 2px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .choice.right { border-color: var(--good); background: rgba(52,211,153,.13); }
+    .choice.right .key { border-color: var(--good); color: var(--good); }
+    .choice.wrong { border-color: var(--bad); background: rgba(248,113,113,.13); }
+    .choice.wrong .key { border-color: var(--bad); color: var(--bad); }
+    .choice:disabled { cursor: default; }
+
+    .rowbtns { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
+    /* ── Summary ──────────────────────────────────────── */
+    .score {
+      display: flex; gap: 26px; align-items: baseline; flex-wrap: wrap;
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: var(--radius); padding: 20px 22px; margin-bottom: 8px;
+    }
+    .score .big { font-size: 2.6rem; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+    .score .lbl { font-size: 0.74rem; text-transform: uppercase; letter-spacing: .12em; color: var(--dimmer); font-weight: 700; }
+
+    .missed { display: grid; gap: 8px; }
+    .missed .item {
+      background: var(--panel); border: 1px solid var(--line);
+      border-left: 3px solid var(--bad); border-radius: 11px; padding: 12px 14px;
+    }
+    .missed .item .mq { font-weight: 600; font-size: 0.9rem; }
+    .missed .item .ma { color: var(--dim); font-size: 0.85rem; margin-top: 6px; }
+
+    /* ── Modal ────────────────────────────────────────── */
+    .modal {
+      position: fixed; inset: 0; z-index: 50;
+      background: rgba(2,4,10,.78);
+      backdrop-filter: blur(3px);
+      display: grid; place-items: center; padding: 18px;
+    }
+    .modal .box {
+      background: var(--panel); border: 1px solid var(--line-strong);
+      border-radius: 16px; padding: 22px; width: min(560px, 100%);
+      max-height: 86vh; overflow: auto;
+    }
+    .modal h3 { font-size: 1.05rem; margin-bottom: 4px; }
+    .modal .sub { color: var(--dim); font-size: 0.82rem; margin-bottom: 16px; }
+    label.f { display: block; margin-bottom: 13px; }
+    label.f span { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--dimmer); font-weight: 700; margin-bottom: 5px; }
+    .modal textarea, .modal input, .modal select {
+      width: 100%; font: inherit; font-size: 0.9rem; color: var(--text);
+      background: #070b14; border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px;
+    }
+    .modal textarea { min-height: 80px; resize: vertical; line-height: 1.5; }
+    .modal .acts { display: flex; gap: 9px; justify-content: flex-end; margin-top: 6px; flex-wrap: wrap; }
+    .modal .acts .left { margin-right: auto; }
+
+    .notice {
+      background: rgba(250, 204, 21, .07);
+      border: 1px solid rgba(250, 204, 21, .22);
+      color: #fde68a;
+      border-radius: 11px;
+      padding: 11px 14px;
+      font-size: 0.8rem;
+      margin-top: 18px;
+      display: flex; gap: 10px; align-items: flex-start;
+    }
+    .notice button { color: #fde68a; text-decoration: underline; font-size: 0.8rem; margin-left: auto; flex: none; }
+
+    footer { margin-top: 34px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--dimmer); font-size: 0.76rem; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+    footer button { color: var(--dim); text-decoration: underline; font-size: 0.76rem; }
+
+    .hide { display: none !important; }
+
+    @media (max-width: 560px) {
+      .card { padding: 20px 17px; min-height: 230px; }
+      header { padding: 20px 0 14px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <header>
+      <div class="brand">
+        <div class="kicker">Star Wars · Edge of the Empire</div>
+        <h1>GM Flash Cards</h1>
+        <p>Drill the rules before the session so you can call them at the table.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn small ghost" id="btn-add">+ Card</button>
+        <button class="btn small ghost" id="btn-data">Data</button>
+      </div>
+    </header>
+
+    <!-- ── SETUP ─────────────────────────────────────── -->
+    <section id="view-setup">
+      <div class="section-label">Decks</div>
+      <div class="topics" id="topics"></div>
+
+      <div class="section-label">Narrow it down</div>
+      <div class="chips" id="filters"></div>
+
+      <div class="section-label">How to quiz</div>
+      <div class="chips" id="modes"></div>
+
+      <div class="section-label">Session</div>
+      <div class="chips" id="lengths"></div>
+
+      <div class="notice" id="notice">
+        <span>These cards are a study aid written from the Edge of the Empire core rules. Trust the rulebook over the deck — and if you spot something off, hit&nbsp;<b>Edit</b> on the card and fix it. Your edits stick around.</span>
+        <button id="notice-x">dismiss</button>
+      </div>
+
+      <div class="startbar">
+        <div class="count" id="pool-count"></div>
+        <button class="btn ghost" id="btn-weak">Weakest first</button>
+        <button class="btn primary" id="btn-start">Start drill →</button>
+      </div>
+
+      <footer>
+        <span id="lifetime"></span>
+        <button id="btn-reset">Reset progress</button>
+      </footer>
+    </section>
+
+    <!-- ── DRILL ─────────────────────────────────────── -->
+    <section id="view-drill" class="hide">
+      <div class="drillbar">
+        <button class="btn small ghost" id="btn-quit">← Decks</button>
+        <div class="progress"><i id="prog"></i></div>
+        <div class="meta" id="drill-meta"></div>
+      </div>
+
+      <div class="card" id="card">
+        <div class="tag" id="card-tag"></div>
+        <div class="body" id="card-body">
+          <div class="q" id="card-q"></div>
+          <div id="card-a"></div>
+        </div>
+        <div class="hint" id="card-hint"></div>
+      </div>
+
+      <div id="card-controls"></div>
+
+      <div class="rowbtns">
+        <button class="btn small ghost" id="btn-edit">Edit this card</button>
+        <button class="btn small ghost" id="btn-skip">Skip</button>
+      </div>
+    </section>
+
+    <!-- ── SUMMARY ───────────────────────────────────── -->
+    <section id="view-done" class="hide">
+      <div class="section-label">Session complete</div>
+      <div class="score" id="score"></div>
+      <div id="missed-wrap"></div>
+      <div class="startbar">
+        <div class="count" id="done-note"></div>
+        <button class="btn ghost" id="btn-again">Run it again</button>
+        <button class="btn primary" id="btn-home">Back to decks</button>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="data.js"></script>
+  <script>
+  (function () {
+    'use strict';
+
+    const $ = (id) => document.getElementById(id);
+    const el = (tag, cls) => { const n = document.createElement(tag); if (cls) n.className = cls; return n; };
+    const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+    /* ── Symbol rendering ─────────────────────────────────────────── */
+
+    const GLYPH = {
+      boost:       ['◼', '#7dd3fc', 'Boost'],
+      setback:     ['◼', '#9aa7bd', 'Setback'],
+      ability:     ['◆', '#4ade80', 'Ability'],
+      difficulty:  ['◆', '#c084fc', 'Difficulty'],
+      proficiency: ['⬢', '#facc15', 'Proficiency'],
+      challenge:   ['⬢', '#f87171', 'Challenge'],
+      force:       ['⬢', '#f1f5f9', 'Force'],
+      success:     ['✦', '#4ade80', 'Success'],
+      advantage:   ['▲', '#4ade80', 'Advantage'],
+      triumph:     ['★', '#facc15', 'Triumph'],
+      failure:     ['✕', '#c084fc', 'Failure'],
+      threat:      ['▼', '#c084fc', 'Threat'],
+      despair:     ['☠', '#f87171', 'Despair']
+    };
+
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    function render(text) {
+      return esc(text)
+        .replace(/\[\[(\w+)\]\]/g, (m, k) => {
+          const g = GLYPH[k.toLowerCase()];
+          if (!g) return m;
+          return '<span class="sym" style="--c:' + g[1] + '">' + g[0] + ' ' + g[2] + '</span>';
+        })
+        .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    }
+
+    /* Plain-text version, for multiple-choice options and the summary list. */
+    function plain(text) {
+      return String(text)
+        .replace(/\[\[(\w+)\]\]/g, (m, k) => (GLYPH[k.toLowerCase()] || [, , m])[2])
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/\*([^*]+)\*/g, '$1');
+    }
+
+    /* ── Card library ─────────────────────────────────────────────── */
+    /*
+      Every card is { id, topic, sub, style, front, back, note, key, group }.
+        style 'define'    — prose question, self-graded
+        style 'attribute' — short keyed answer, can be asked as multiple choice
+        style 'reverse'   — given the description, name the thing
+        key/group         — the correct short answer and the pool to draw
+                            wrong multiple-choice options from
+    */
+
+    function buildLibrary() {
+      const cards = [];
+      const add = (c) => { cards.push(c); return c; };
+
+      /* Skills */
+      EOTE.skills.forEach(([name, chr, type, desc]) => {
+        const s = slug(name);
+        add({
+          id: 'skill:' + s + ':char', topic: 'skills', sub: type, style: 'attribute',
+          front: 'Which characteristic governs **' + name + '**?',
+          back: chr, note: type + ' skill — ' + desc,
+          key: chr, group: 'characteristic'
+        });
+        add({
+          id: 'skill:' + s + ':def', topic: 'skills', sub: type, style: 'define',
+          front: 'What does **' + name + '** cover, and what does it roll?',
+          back: desc + ' Rolled on **' + chr + '** — a ' + type.toLowerCase() + ' skill.'
+        });
+        add({
+          id: 'skill:' + s + ':rev', topic: 'skills', sub: type, style: 'reverse',
+          front: 'Which skill is this? *' + desc + '*',
+          back: name + ' (' + chr + ')',
+          key: name, group: 'skill'
+        });
+      });
+
+      /* Adjudication calls */
+      EOTE.calls.forEach(([scene, skill, note], i) => {
+        const row = EOTE.skills.find((r) => r[0] === skill);
+        add({
+          id: 'call:' + i, topic: 'calls', sub: null, style: 'attribute',
+          front: scene + '<br>**Which skill do you ask for?**',
+          back: skill + (row ? ' (' + row[1] + ')' : ''), note: note,
+          key: skill, group: 'skill'
+        });
+      });
+
+      /* Dice */
+      EOTE.dice.forEach((d) => {
+        const s = slug(d.short);
+        add({
+          id: 'die:' + s + ':profile', topic: 'dice', sub: d.side, style: 'define',
+          front: 'Describe the **' + d.name + '**: colour, sides, symbols and where it comes from.',
+          back: d.color + ', ' + d.sides + '-sided. Shows ' + d.symbols + '.', note: d.source
+        });
+        add({
+          id: 'die:' + s + ':colour', topic: 'dice', sub: d.side, style: 'attribute',
+          front: 'What colour and shape is the **' + d.name + '**?',
+          back: d.color + ', d' + d.sides,
+          key: d.color + ', d' + d.sides, group: 'dieProfile'
+        });
+        add({
+          id: 'die:' + s + ':faces', topic: 'dice', sub: d.side, style: 'define',
+          front: 'List the faces of the **' + d.name + '**.',
+          back: d.faces
+        });
+      });
+
+      /* Weapon qualities */
+      EOTE.qualities.forEach(([name, act, effect]) => {
+        const s = slug(name);
+        const kind = act.startsWith('Active') ? 'Active' : 'Passive';
+        add({
+          id: 'qual:' + s + ':def', topic: 'qualities', sub: kind, style: 'define',
+          front: 'What does the **' + name + '** quality do?',
+          back: effect, note: act
+        });
+        add({
+          id: 'qual:' + s + ':act', topic: 'qualities', sub: kind, style: 'attribute',
+          front: 'Is **' + name + '** passive, or active — and what does activating it cost?',
+          back: act, note: effect,
+          key: act, group: 'qualityActivation'
+        });
+      });
+
+      /* Talents */
+      EOTE.talents.forEach(([name, tier, act, ranked, effect]) => {
+        const s = slug(name);
+        const tierLabel = tier ? 'Tier ' + tier : 'NPC talent';
+        add({
+          id: 'talent:' + s + ':def', topic: 'talents', sub: tierLabel, style: 'define',
+          front: 'What does the **' + name + '** talent do?',
+          back: effect, note: tierLabel + ' · ' + act + (ranked ? ' · ranked' : ' · not ranked')
+        });
+        if (tier) {
+          add({
+            id: 'talent:' + s + ':tier', topic: 'talents', sub: tierLabel, style: 'attribute',
+            front: 'What tier is **' + name + '**, and what does it cost in XP?',
+            back: 'Tier ' + tier + ' — ' + (tier * 5) + ' XP', note: effect,
+            key: 'Tier ' + tier + ' — ' + (tier * 5) + ' XP', group: 'tier'
+          });
+        }
+        add({
+          id: 'talent:' + s + ':act', topic: 'talents', sub: tierLabel, style: 'attribute',
+          front: 'How is **' + name + '** activated?',
+          back: act + (ranked ? ' (ranked)' : ''), note: effect,
+          key: act, group: 'activation'
+        });
+        add({
+          id: 'talent:' + s + ':rev', topic: 'talents', sub: tierLabel, style: 'reverse',
+          front: 'Which talent does this? *' + plain(effect) + '*',
+          back: name + ' — ' + tierLabel + ', ' + act
+        });
+      });
+
+      /* Rules */
+      EOTE.rules.forEach((r, i) => {
+        add({
+          id: 'rule:' + r.t + ':' + i, topic: r.t, sub: null, style: 'define',
+          front: r.q, back: r.a, note: r.n || ''
+        });
+      });
+
+      return cards;
+    }
+
+    /* ── Persistent state ─────────────────────────────────────────── */
+
+    const KEY = 'eote-flashcards-v1';
+
+    const defaults = () => ({
+      progress: {},          /* id -> {b: box 1-5, r, w, t} */
+      overrides: {},         /* id -> {front, back, note} */
+      custom: [],            /* extra cards authored in the app */
+      settings: {
+        topics: ['skills', 'calls', 'dice'],
+        offSubs: [], offStyles: [],
+        mode: 'mixed', length: 20, weakFirst: true, noticeSeen: false
+      },
+      lifetime: { right: 0, wrong: 0, sessions: 0 }
+    });
+
+    let db = defaults();
+
+    function load() {
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          db = Object.assign(defaults(), parsed);
+          db.settings = Object.assign(defaults().settings, parsed.settings || {});
+          db.lifetime = Object.assign(defaults().lifetime, parsed.lifetime || {});
+        }
+      } catch (e) { /* corrupt or unavailable storage — carry on with defaults */ }
+    }
+
+    function save() {
+      try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { /* private mode */ }
+    }
+
+    load();
+
+    /* ── Library, with user edits applied ─────────────────────────── */
+
+    let LIB = [];
+
+    function refreshLibrary() {
+      LIB = buildLibrary().concat(db.custom.map((c) => Object.assign({ style: 'define', sub: 'Custom' }, c)));
+      LIB.forEach((c) => {
+        const o = db.overrides[c.id];
+        if (o) {
+          if (o.front) c.front = o.front;
+          if (o.back && o.back !== c.back) {
+            /* Multiple choice grades against a short key, which the user has
+               now replaced with their own wording — ask it as a flip card. */
+            c.back = o.back;
+            delete c.group; delete c.key;
+          }
+          if (typeof o.note === 'string') c.note = o.note;
+          c.edited = true;
+        }
+      });
+    }
+
+    refreshLibrary();
+
+    const topicById = {};
+    EOTE.topics.forEach((t) => { topicById[t.id] = t; });
+    topicById.custom = { id: 'custom', label: 'My Cards', blurb: 'Cards you added yourself.', color: '#f472b6' };
+
+    const boxOf = (id) => (db.progress[id] && db.progress[id].b) || 1;
+    const seenOf = (id) => !!db.progress[id];
+
+    const STYLES = [
+      ['define', 'Definitions'],
+      ['attribute', 'Short answers'],
+      ['reverse', 'Name the thing']
+    ];
+
+    /* ── Pool selection ───────────────────────────────────────────── */
+
+    function topicList() {
+      const list = EOTE.topics.slice();
+      if (db.custom.length) list.push(topicById.custom);
+      return list;
+    }
+
+    function cardsForTopic(id) { return LIB.filter((c) => c.topic === id); }
+
+    function pool() {
+      const S = db.settings;
+      return LIB.filter((c) => {
+        if (S.topics.indexOf(c.topic) === -1) return false;
+        if (S.offStyles.indexOf(c.style) !== -1) return false;
+        if (c.sub && S.offSubs.indexOf(c.topic + ':' + c.sub) !== -1) return false;
+        if (S.mode === 'mc' && !c.group) return false;
+        return true;
+      });
+    }
+
+    /* ── Setup screen ─────────────────────────────────────────────── */
+
+    function drawTopics() {
+      const wrap = $('topics');
+      wrap.innerHTML = '';
+      topicList().forEach((t) => {
+        const all = cardsForTopic(t.id);
+        const learned = all.filter((c) => boxOf(c.id) >= 4).length;
+        const pct = all.length ? Math.round((learned / all.length) * 100) : 0;
+        const on = db.settings.topics.indexOf(t.id) !== -1;
+
+        const b = el('button', 'topic');
+        b.style.setProperty('--tc', t.color);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.innerHTML =
+          '<div class="name"><span class="tick"></span>' + esc(t.label) + '</div>' +
+          '<div class="blurb">' + esc(t.blurb) + '</div>' +
+          '<div class="foot"><span>' + all.length + ' cards</span>' +
+          '<span class="bar"><i style="width:' + pct + '%"></i></span>' +
+          '<span>' + pct + '% learned</span></div>';
+        b.onclick = () => {
+          const i = db.settings.topics.indexOf(t.id);
+          if (i === -1) db.settings.topics.push(t.id); else db.settings.topics.splice(i, 1);
+          save(); drawSetup();
+        };
+        wrap.appendChild(b);
+      });
+    }
+
+    function chipRow(label, items) {
+      const row = el('div');
+      row.style.cssText = 'display:flex;gap:9px;align-items:center;flex-wrap:wrap;width:100%';
+      if (label) {
+        const l = el('span');
+        l.style.cssText = 'font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(230,236,245,.35);font-weight:700;min-width:96px';
+        l.textContent = label;
+        row.appendChild(l);
+      }
+      items.forEach((n) => row.appendChild(n));
+      return row;
+    }
+
+    function chip(text, on, onclick, count) {
+      const c = el('button', 'chip');
+      c.setAttribute('aria-pressed', on ? 'true' : 'false');
+      c.innerHTML = esc(text) + (count != null ? '<span class="n">' + count + '</span>' : '');
+      c.onclick = onclick;
+      return c;
+    }
+
+    function drawFilters() {
+      const wrap = $('filters');
+      wrap.innerHTML = '';
+      wrap.style.cssText = 'display:flex;flex-direction:column;gap:10px';
+      const S = db.settings;
+
+      /* Sub-filters, one row per selected topic that has them */
+      S.topics.forEach((tid) => {
+        const subs = [];
+        cardsForTopic(tid).forEach((c) => { if (c.sub && subs.indexOf(c.sub) === -1) subs.push(c.sub); });
+        if (subs.length < 2) return;
+        const items = subs.map((s) => {
+          const k = tid + ':' + s;
+          const n = cardsForTopic(tid).filter((c) => c.sub === s).length;
+          return chip(s, S.offSubs.indexOf(k) === -1, () => {
+            const i = S.offSubs.indexOf(k);
+            if (i === -1) S.offSubs.push(k); else S.offSubs.splice(i, 1);
+            save(); drawSetup();
+          }, n);
+        });
+        wrap.appendChild(chipRow(topicById[tid].label, items));
+      });
+
+      /* Question style */
+      const styleItems = STYLES.map(([k, label]) =>
+        chip(label, S.offStyles.indexOf(k) === -1, () => {
+          const i = S.offStyles.indexOf(k);
+          if (i === -1) S.offStyles.push(k); else S.offStyles.splice(i, 1);
+          save(); drawSetup();
+        }, pool().filter((c) => c.style === k).length || undefined)
+      );
+      wrap.appendChild(chipRow('Card style', styleItems));
+
+      if (!wrap.children.length) {
+        wrap.innerHTML = '<div style="color:rgba(230,236,245,.35);font-size:.82rem">Pick a deck above to see its filters.</div>';
+      }
+    }
+
+    function drawModes() {
+      const S = db.settings;
+      const wrap = $('modes');
+      wrap.innerHTML = '';
+      const mcCount = LIB.filter((c) => c.group && S.topics.indexOf(c.topic) !== -1).length;
+      [
+        ['flip', 'Flip &amp; self-grade'],
+        ['mc', 'Multiple choice'],
+        ['mixed', 'Mixed']
+      ].forEach(([k, label]) => {
+        const c = chip('', S.mode === k, () => { S.mode = k; save(); drawSetup(); });
+        c.innerHTML = label + (k === 'mc' ? '<span class="n">' + mcCount + '</span>' : '');
+        if (k === 'mc' && !mcCount) c.disabled = true;
+        wrap.appendChild(c);
+      });
+
+      const lens = $('lengths');
+      lens.innerHTML = '';
+      [10, 20, 40, 0].forEach((n) => {
+        lens.appendChild(chip(n ? n + ' cards' : 'Everything', S.length === n, () => {
+          S.length = n; save(); drawSetup();
+        }));
+      });
+    }
+
+    function drawSetup() {
+      drawTopics(); drawFilters(); drawModes();
+      const p = pool();
+      const n = db.settings.length ? Math.min(db.settings.length, p.length) : p.length;
+      $('pool-count').innerHTML = p.length
+        ? '<b>' + n + '</b> card' + (n === 1 ? '' : 's') + ' this run <span style="opacity:.5">· ' + p.length + ' in the selection</span>'
+        : 'Nothing selected yet.';
+      $('btn-start').disabled = !p.length;
+      $('btn-weak').setAttribute('aria-pressed', db.settings.weakFirst ? 'true' : 'false');
+      $('btn-weak').style.borderColor = db.settings.weakFirst ? 'var(--accent)' : '';
+      $('btn-weak').style.color = db.settings.weakFirst ? '#bae6fd' : '';
+
+      const lt = db.lifetime;
+      const tot = lt.right + lt.wrong;
+      $('lifetime').textContent = tot
+        ? lt.sessions + ' session' + (lt.sessions === 1 ? '' : 's') + ' · ' + tot + ' cards answered · ' +
+          Math.round((lt.right / tot) * 100) + '% right'
+        : 'No sessions yet — pick a few decks and start.';
+      $('notice').classList.toggle('hide', !!db.settings.noticeSeen);
+    }
+
+    /* ── Drill ────────────────────────────────────────────────────── */
+
+    let run = null;
+
+    function startDrill() {
+      let p = pool().slice();
+
+      /* Shuffle, then optionally float the least-known cards to the front. */
+      for (let i = p.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const t = p[i]; p[i] = p[j]; p[j] = t;
+      }
+      if (db.settings.weakFirst) {
+        p.sort((a, b) => {
+          const ba = boxOf(a.id), bb = boxOf(b.id);
+          if (ba !== bb) return ba - bb;
+          const ta = (db.progress[a.id] || {}).t || 0;
+          const tb = (db.progress[b.id] || {}).t || 0;
+          return ta - tb;
+        });
+      }
+      if (db.settings.length) p = p.slice(0, db.settings.length);
+
+      run = { queue: p, i: 0, right: 0, wrong: 0, streak: 0, best: 0, missed: [], total: p.length, started: Date.now() };
+      show('drill');
+      showCard();
+    }
+
+    function show(which) {
+      ['setup', 'drill', 'done'].forEach((v) => $('view-' + v).classList.toggle('hide', v !== which));
+      window.scrollTo(0, 0);
+    }
+
+    function currentCard() { return run.queue[run.i]; }
+
+    function askAsMC(card) {
+      if (!card.group) return false;
+      if (db.settings.mode === 'mc') return true;
+      if (db.settings.mode === 'flip') return false;
+      return Math.random() < 0.5; /* mixed: roughly half and half */
+    }
+
+    function optionsFor(card) {
+      const others = [];
+      LIB.forEach((c) => {
+        if (c.group !== card.group || !c.key || c.key === card.key) return;
+        if (others.indexOf(c.key) === -1) others.push(c.key);
+      });
+      for (let i = others.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const t = others[i]; others[i] = others[j]; others[j] = t;
+      }
+      const opts = others.slice(0, 3).concat([card.key]);
+      for (let i = opts.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const t = opts[i]; opts[i] = opts[j]; opts[j] = t;
+      }
+      return opts;
+    }
+
+    let state = { revealed: false, answered: false, options: null, mc: false };
+
+    function showCard() {
+      if (run.i >= run.queue.length) return finish();
+      const c = currentCard();
+      const t = topicById[c.topic] || { label: c.topic, color: '#38bdf8' };
+
+      state = { revealed: false, answered: false, options: null, mc: askAsMC(c) };
+      if (state.mc) state.options = optionsFor(c);
+      if (state.mc && state.options.length < 4) { state.mc = false; state.options = null; }
+
+      $('card').style.setProperty('--tc', t.color);
+      /* "Tier 2" over a card asking which tier it is would answer itself. */
+      const answerText = (plain(c.back) + ' ' + (c.key || '')).toLowerCase();
+      const showSub = c.sub && answerText.indexOf(c.sub.toLowerCase()) === -1;
+
+      $('card-tag').innerHTML =
+        '<span>' + esc(t.label) + '</span>' +
+        (showSub ? '<span class="sub">' + esc(c.sub) + '</span>' : '') +
+        (c.edited ? '<span class="sub">edited</span>' : '') +
+        '<span class="boxlvl">' + (seenOf(c.id) ? 'box ' + boxOf(c.id) + '/5' : 'new') + '</span>';
+      $('card-q').innerHTML = render(c.front);
+      $('card-a').innerHTML = '';
+
+      const len = run.queue.length;
+      $('prog').style.width = Math.round((run.i / len) * 100) + '%';
+      $('drill-meta').innerHTML =
+        '<b>' + (run.i + 1) + '</b>/' + len +
+        (len > run.total ? ' <span style="opacity:.6">(+' + (len - run.total) + ' repeats)</span>' : '') +
+        ' · <b>' + run.right + '</b> right' +
+        (run.streak > 1 ? ' · <span class="streak">' + run.streak + ' streak</span>' : '');
+
+      if (state.mc) drawChoices(c); else drawFlip();
+    }
+
+    function drawFlip() {
+      const ctl = $('card-controls');
+      ctl.innerHTML = '';
+      $('card-hint').innerHTML = 'Answer out loud first. <kbd>Space</kbd> to reveal.';
+      const row = el('div', 'grade');
+      const b = el('button', 'btn primary');
+      b.textContent = 'Reveal answer';
+      b.onclick = reveal;
+      row.appendChild(b);
+      ctl.appendChild(row);
+    }
+
+    function reveal() {
+      const c = currentCard();
+      state.revealed = true;
+      $('card-a').innerHTML =
+        '<div class="a">' + render(c.back) +
+        (c.note ? '<div class="note">' + render(c.note) + '</div>' : '') + '</div>';
+      $('card-hint').innerHTML = 'Did you get it? <kbd>1</kbd> missed · <kbd>2</kbd> got it';
+
+      const ctl = $('card-controls');
+      ctl.innerHTML = '';
+      const row = el('div', 'grade');
+      const miss = el('button', 'btn miss');
+      miss.textContent = '1 · Missed it';
+      miss.onclick = () => grade(false);
+      const got = el('button', 'btn got');
+      got.textContent = '2 · Got it';
+      got.onclick = () => grade(true);
+      row.appendChild(miss); row.appendChild(got);
+      ctl.appendChild(row);
+    }
+
+    function drawChoices(c) {
+      $('card-hint').innerHTML = 'Pick one — <kbd>1</kbd>–<kbd>4</kbd> work too.';
+      const ctl = $('card-controls');
+      ctl.innerHTML = '';
+      const box = el('div', 'choices');
+      state.options.forEach((opt, i) => {
+        const b = el('button', 'choice');
+        b.innerHTML = '<span class="key">' + (i + 1) + '</span><span>' + render(opt) + '</span>';
+        b.onclick = () => answerMC(i);
+        box.appendChild(b);
+      });
+      ctl.appendChild(box);
+    }
+
+    function answerMC(i) {
+      if (state.answered) return;
+      state.answered = true;
+      const c = currentCard();
+      const picked = state.options[i];
+      const correct = picked === c.key;
+      const nodes = $('card-controls').querySelectorAll('.choice');
+      nodes.forEach((n, k) => {
+        n.disabled = true;
+        if (state.options[k] === c.key) n.classList.add('right');
+        else if (k === i) n.classList.add('wrong');
+      });
+      if (c.note) {
+        $('card-a').innerHTML = '<div class="a"><div class="note">' + render(c.note) + '</div></div>';
+      }
+      $('card-hint').innerHTML = correct
+        ? '<span style="color:#6ee7b7">Correct.</span> <kbd>Space</kbd> for the next card.'
+        : '<span style="color:#fca5a5">Not quite.</span> <kbd>Space</kbd> for the next card.';
+      setTimeout(() => grade(correct, true), correct ? 550 : 1500);
+    }
+
+    function grade(ok, auto) {
+      const c = currentCard();
+      const p = db.progress[c.id] || { b: 1, r: 0, w: 0, t: 0 };
+      if (ok) { p.b = Math.min(5, p.b + 1); p.r++; run.right++; run.streak++; }
+      else { p.b = 1; p.w++; run.wrong++; run.streak = 0; run.missed.push(c); }
+      run.best = Math.max(run.best, run.streak);
+      p.t = Date.now();
+      db.progress[c.id] = p;
+      db.lifetime[ok ? 'right' : 'wrong']++;
+      save();
+
+      /* A missed card comes back later in the same session. */
+      if (!ok && run.queue.length < run.total + 6) run.queue.push(c);
+
+      run.i++;
+      if (auto) setTimeout(showCard, 60); else showCard();
+    }
+
+    function skip() {
+      const c = run.queue.splice(run.i, 1)[0];
+      run.queue.push(c);
+      showCard();
+    }
+
+    function finish() {
+      db.lifetime.sessions++;
+      save();
+      const answered = run.right + run.wrong;
+      const pct = answered ? Math.round((run.right / answered) * 100) : 0;
+      const mins = Math.max(1, Math.round((Date.now() - run.started) / 60000));
+
+      $('score').innerHTML =
+        '<div><div class="big">' + pct + '%</div><div class="lbl">Accuracy</div></div>' +
+        '<div><div class="big">' + run.right + '</div><div class="lbl">Right</div></div>' +
+        '<div><div class="big">' + run.wrong + '</div><div class="lbl">Missed</div></div>' +
+        '<div><div class="big">' + run.best + '</div><div class="lbl">Best streak</div></div>' +
+        '<div><div class="big">' + mins + '</div><div class="lbl">Minutes</div></div>';
+
+      const uniq = [];
+      run.missed.forEach((c) => { if (uniq.indexOf(c) === -1) uniq.push(c); });
+      const wrap = $('missed-wrap');
+      if (uniq.length) {
+        wrap.innerHTML = '<div class="section-label">Worth another look</div>';
+        const list = el('div', 'missed');
+        uniq.forEach((c) => {
+          const it = el('div', 'item');
+          it.innerHTML = '<div class="mq">' + render(c.front) + '</div><div class="ma">' + render(c.back) + '</div>';
+          list.appendChild(it);
+        });
+        wrap.appendChild(list);
+        $('done-note').textContent = uniq.length + ' card' + (uniq.length === 1 ? '' : 's') + ' dropped back to box 1.';
+      } else {
+        wrap.innerHTML = '<div class="section-label">Clean run</div>' +
+          '<div style="color:rgba(230,236,245,.55);font-size:.9rem">Nothing missed. Widen the selection or turn off "weakest first" to push into new material.</div>';
+        $('done-note').textContent = '';
+      }
+      show('done');
+    }
+
+    /* ── Modals ───────────────────────────────────────────────────── */
+
+    let modal = null;
+
+    function closeModal() {
+      if (modal) { modal.remove(); modal = null; }
+    }
+
+    function openModal(title, sub, bodyHTML, wire) {
+      closeModal();
+      modal = el('div', 'modal');
+      const box = el('div', 'box');
+      box.innerHTML = '<h3>' + esc(title) + '</h3><div class="sub">' + sub + '</div>' + bodyHTML;
+      modal.appendChild(box);
+      modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+      document.body.appendChild(modal);
+      wire(box);
+      const first = box.querySelector('textarea, input, select');
+      if (first) first.focus();
+    }
+
+    function editCard(card) {
+      openModal('Edit card', 'Corrections are stored in this browser and survive updates to the deck.',
+        '<label class="f"><span>Question</span><textarea id="e-front"></textarea></label>' +
+        '<label class="f"><span>Answer</span><textarea id="e-back"></textarea></label>' +
+        '<label class="f"><span>Note (optional)</span><textarea id="e-note" style="min-height:56px"></textarea></label>' +
+        '<div style="font-size:.75rem;color:rgba(230,236,245,.35);margin-bottom:14px">' +
+        'Markup: **bold**, and [[success]] [[advantage]] [[triumph]] [[failure]] [[threat]] [[despair]] ' +
+        '[[boost]] [[setback]] [[ability]] [[difficulty]] [[proficiency]] [[challenge]] [[force]].</div>' +
+        '<div class="acts">' +
+        (db.overrides[card.id] ? '<button class="btn ghost left" id="e-revert">Revert to original</button>' : '') +
+        '<button class="btn ghost" id="e-cancel">Cancel</button>' +
+        '<button class="btn primary" id="e-save">Save</button></div>',
+        (box) => {
+          box.querySelector('#e-front').value = card.front;
+          box.querySelector('#e-back').value = card.back;
+          box.querySelector('#e-note').value = card.note || '';
+          box.querySelector('#e-cancel').onclick = closeModal;
+          const rev = box.querySelector('#e-revert');
+          if (rev) rev.onclick = () => {
+            delete db.overrides[card.id]; save(); refreshLibrary(); closeModal(); afterLibraryChange();
+          };
+          box.querySelector('#e-save').onclick = () => {
+            db.overrides[card.id] = {
+              front: box.querySelector('#e-front').value.trim(),
+              back: box.querySelector('#e-back').value.trim(),
+              note: box.querySelector('#e-note').value.trim()
+            };
+            save(); refreshLibrary(); closeModal(); afterLibraryChange();
+          };
+        });
+    }
+
+    /* Keep the card on screen in sync after the library is rebuilt. */
+    function afterLibraryChange() {
+      if (run) {
+        run.queue = run.queue.map((c) => LIB.find((x) => x.id === c.id) || c);
+        showCard();
+      } else {
+        drawSetup();
+      }
+    }
+
+    function addCard() {
+      const opts = topicList().map((t) => '<option value="' + t.id + '">' + esc(t.label) + '</option>').join('');
+      openModal('New card', 'Your own rulings, house rules, or anything the deck is missing.',
+        '<label class="f"><span>Deck</span><select id="a-topic">' + opts +
+        '<option value="custom">My Cards</option></select></label>' +
+        '<label class="f"><span>Question</span><textarea id="a-front"></textarea></label>' +
+        '<label class="f"><span>Answer</span><textarea id="a-back"></textarea></label>' +
+        '<label class="f"><span>Note (optional)</span><textarea id="a-note" style="min-height:56px"></textarea></label>' +
+        '<div class="acts"><button class="btn ghost" id="a-cancel">Cancel</button>' +
+        '<button class="btn primary" id="a-save">Add card</button></div>',
+        (box) => {
+          box.querySelector('#a-cancel').onclick = closeModal;
+          box.querySelector('#a-save').onclick = () => {
+            const front = box.querySelector('#a-front').value.trim();
+            const back = box.querySelector('#a-back').value.trim();
+            if (!front || !back) return;
+            const topic = box.querySelector('#a-topic').value;
+            db.custom.push({
+              id: 'custom:' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+              topic: topic, sub: topic === 'custom' ? null : 'Custom',
+              front: front, back: back, note: box.querySelector('#a-note').value.trim()
+            });
+            if (db.settings.topics.indexOf(topic) === -1) db.settings.topics.push(topic);
+            save(); refreshLibrary(); closeModal(); afterLibraryChange();
+          };
+        });
+    }
+
+    function dataModal() {
+      const payload = JSON.stringify({ overrides: db.overrides, custom: db.custom, progress: db.progress, lifetime: db.lifetime });
+      openModal('Your data', 'Edits, custom cards and progress live in this browser only. Copy this to move them to another device.',
+        '<label class="f"><span>Export / import</span><textarea id="d-json" spellcheck="false" style="min-height:150px;font-family:ui-monospace,Menlo,monospace;font-size:.74rem"></textarea></label>' +
+        '<div class="acts"><button class="btn ghost left" id="d-copy">Copy</button>' +
+        '<button class="btn ghost" id="d-cancel">Close</button>' +
+        '<button class="btn primary" id="d-import">Import what is above</button></div>',
+        (box) => {
+          const ta = box.querySelector('#d-json');
+          ta.value = payload;
+          box.querySelector('#d-cancel').onclick = closeModal;
+          box.querySelector('#d-copy').onclick = (e) => {
+            ta.select();
+            try { document.execCommand('copy'); } catch (err) { /* ignore */ }
+            if (navigator.clipboard) navigator.clipboard.writeText(ta.value).catch(() => {});
+            e.target.textContent = 'Copied';
+          };
+          box.querySelector('#d-import').onclick = (e) => {
+            let parsed;
+            try { parsed = JSON.parse(ta.value); }
+            catch (err) { e.target.textContent = 'That is not valid JSON'; return; }
+            db.overrides = parsed.overrides || {};
+            db.custom = parsed.custom || [];
+            db.progress = parsed.progress || {};
+            db.lifetime = Object.assign(defaults().lifetime, parsed.lifetime || {});
+            save(); refreshLibrary(); closeModal(); afterLibraryChange();
+          };
+        });
+    }
+
+    /* ── Wiring ───────────────────────────────────────────────────── */
+
+    $('btn-start').onclick = startDrill;
+    $('btn-weak').onclick = () => { db.settings.weakFirst = !db.settings.weakFirst; save(); drawSetup(); };
+    $('btn-quit').onclick = () => { run = null; show('setup'); drawSetup(); };
+    $('btn-skip').onclick = skip;
+    $('btn-edit').onclick = () => editCard(currentCard());
+    $('btn-add').onclick = addCard;
+    $('btn-data').onclick = dataModal;
+    $('btn-home').onclick = () => { run = null; show('setup'); drawSetup(); };
+    $('btn-again').onclick = startDrill;
+    $('notice-x').onclick = () => { db.settings.noticeSeen = true; save(); drawSetup(); };
+
+    $('btn-reset').onclick = () => {
+      if (!confirm('Clear every box level and streak? Your card edits and custom cards are kept.')) return;
+      db.progress = {};
+      db.lifetime = defaults().lifetime;
+      save(); drawSetup();
+    };
+
+    document.addEventListener('keydown', (e) => {
+      if (modal) {
+        if (e.key === 'Escape') closeModal();
+        return;
+      }
+      const tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+      if ($('view-setup').classList.contains('hide') === false) {
+        if (e.key === 'Enter' && !$('btn-start').disabled) { e.preventDefault(); startDrill(); }
+        return;
+      }
+      if (!run || $('view-drill').classList.contains('hide')) return;
+
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        if (state.mc) { if (state.answered) { /* the timer handles it */ } return; }
+        if (!state.revealed) reveal();
+        return;
+      }
+      if (state.mc && !state.answered && e.key >= '1' && e.key <= '4') {
+        const i = parseInt(e.key, 10) - 1;
+        if (i < state.options.length) { e.preventDefault(); answerMC(i); }
+        return;
+      }
+      if (!state.mc && state.revealed) {
+        if (e.key === '1') { e.preventDefault(); grade(false); }
+        if (e.key === '2') { e.preventDefault(); grade(true); }
+        return;
+      }
+      if (e.key.toLowerCase() === 's') { e.preventDefault(); skip(); }
+      if (e.key.toLowerCase() === 'e') { e.preventDefault(); editCard(currentCard()); }
+      if (e.key === 'Escape') { run = null; show('setup'); drawSetup(); }
+    });
+
+    drawSetup();
+  })();
+  </script>
+</body>
+
+</html>

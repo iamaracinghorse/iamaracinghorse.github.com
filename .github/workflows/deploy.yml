@@ -47,6 +47,7 @@ jobs:
           cp signature.html _site/
           cp signpost.css _site/
           cp -r venn-builder _site/venn-builder
+          cp -r eote-flashcards _site/eote-flashcards
           cp -r music-box/dist/. _site/music-box/
 
       - uses: actions/configure-pages@v4
