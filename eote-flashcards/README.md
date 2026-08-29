@@ -4,7 +4,9 @@ A self-drilling deck of Star Wars: Edge of the Empire rules, for a GM who
 wants the mechanics in their head before the session rather than in an index
 during it.
 
-Open `index.html` — no build step, no dependencies, works offline.
+Open `index.html` — no build step, no dependencies, no network. Fonts are
+self-hosted, so it works fully offline: useful at a table with bad signal, and
+it can be saved to a phone's home screen.
 
 ## What is in it
 
@@ -36,8 +38,16 @@ Around 380 cards generated from `data.js`, across eleven decks:
 - Progress, edits and custom cards persist in `localStorage`. **Data** exports
   them as JSON to move between devices.
 
-Keyboard: `Space` reveals · `1`/`2` grade missed/got it · `1`–`4` pick a
-multiple-choice answer · `S` skip · `E` edit · `Esc` back to the decks.
+On a phone, tap the card to reveal it and the masthead gets out of the way
+while you drill. On a keyboard: `Space` reveals · `1`/`2` grade missed/got it ·
+`1`–`4` pick a multiple-choice answer · `S` skip · `E` edit · `Esc` back to the
+decks.
+
+## Type
+
+Saira Condensed for signage, Barlow for reading, Space Mono for keys — latin
+subsets vendored into `fonts/` under the Open Font License, wired up by
+`fonts.css`.
 
 ## Fixing and extending the deck
 

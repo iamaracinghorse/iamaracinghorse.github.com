@@ -6,8 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#05070d">
   <title>Edge of the Empire — GM Flash Cards</title>
+
+  <link rel="stylesheet" href="fonts.css">
+
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
     :root {
       --bg: #05070d;
@@ -22,12 +25,17 @@
       --good: #34d399;
       --bad: #f87171;
       --radius: 14px;
+
+      /* Saira Condensed for signage, Barlow for reading, Space Mono for keys. */
+      --font-display: 'Saira Condensed', 'Helvetica Neue Condensed', 'Arial Narrow', system-ui, sans-serif;
+      --font-body: 'Barlow', 'Helvetica Neue', Helvetica, system-ui, -apple-system, sans-serif;
+      --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
     }
 
     html { -webkit-text-size-adjust: 100%; }
 
     body {
-      font-family: 'Helvetica Neue', Helvetica, system-ui, -apple-system, sans-serif;
+      font-family: var(--font-body);
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -51,23 +59,28 @@
       flex-wrap: wrap;
     }
 
+    .brand { flex: 1 1 220px; }
+
     .brand h1 {
-      font-size: clamp(1.35rem, 4.2vw, 1.9rem);
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      line-height: 1.15;
+      font-family: var(--font-display);
+      font-size: clamp(1.9rem, 7vw, 2.7rem);
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.015em;
+      line-height: 1;
     }
 
     .brand .kicker {
-      font-size: 0.68rem;
-      letter-spacing: 0.19em;
+      font-family: var(--font-display);
+      font-size: 0.8rem;
+      letter-spacing: 0.24em;
       text-transform: uppercase;
       color: var(--accent);
       font-weight: 700;
-      margin-bottom: 5px;
+      margin-bottom: 3px;
     }
 
-    .brand p { color: var(--dim); font-size: 0.86rem; margin-top: 5px; }
+    .brand p { color: var(--dim); font-size: 0.9rem; margin-top: 6px; max-width: 46ch; }
 
     /* ── Buttons ──────────────────────────────────────── */
     button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
@@ -76,9 +89,12 @@
       background: var(--panel-2);
       border: 1px solid var(--line);
       border-radius: 10px;
-      padding: 9px 15px;
-      font-size: 0.86rem;
-      font-weight: 600;
+      padding: 10px 16px;
+      font-family: var(--font-display);
+      font-size: 1rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-weight: 700;
       transition: border-color .15s, background .15s, transform .08s;
       white-space: nowrap;
     }
@@ -86,7 +102,7 @@
     .btn:hover { border-color: var(--line-strong); background: #1a2338; }
     .btn:active { transform: translateY(1px); }
     .btn.ghost { background: transparent; }
-    .btn.small { padding: 6px 11px; font-size: 0.78rem; }
+    .btn.small { padding: 7px 12px; font-size: 0.86rem; }
 
     .btn.primary {
       background: var(--accent);
@@ -100,8 +116,9 @@
 
     /* ── Setup: topic tiles ───────────────────────────── */
     .section-label {
-      font-size: 0.68rem;
-      letter-spacing: 0.16em;
+      font-family: var(--font-display);
+      font-size: 0.82rem;
+      letter-spacing: 0.2em;
       text-transform: uppercase;
       color: var(--dimmer);
       font-weight: 700;
@@ -145,8 +162,10 @@
     .topic[aria-pressed="true"]::before { opacity: 1; }
 
     .topic .name {
+      font-family: var(--font-display);
       font-weight: 700;
-      font-size: 0.95rem;
+      font-size: 1.15rem;
+      letter-spacing: 0.02em;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -180,12 +199,21 @@
     /* ── Chips ────────────────────────────────────────── */
     .chips { display: flex; flex-wrap: wrap; gap: 7px; }
 
+    .frow { display: flex; gap: 9px; align-items: baseline; width: 100%; }
+    .frow .flabel {
+      font-family: var(--font-display); font-size: 0.82rem; letter-spacing: .14em;
+      text-transform: uppercase; color: var(--dimmer); font-weight: 700;
+      min-width: 104px; flex: none;
+    }
+    .frow .fchips { display: flex; flex-wrap: wrap; gap: 7px; flex: 1; }
+
     .chip {
       border: 1px solid var(--line);
       background: var(--panel);
       border-radius: 999px;
-      padding: 6px 13px;
-      font-size: 0.79rem;
+      padding: 8px 15px;
+      min-height: 38px;
+      font-size: 0.86rem;
       color: var(--dim);
       transition: all .15s;
       white-space: nowrap;
@@ -201,7 +229,9 @@
       bottom: 0;
       margin-top: 26px;
       padding: 13px 0 calc(13px + env(safe-area-inset-bottom));
-      background: var(--bg);
+      background: rgba(5, 7, 13, 0.82);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
       border-top: 1px solid var(--line);
       margin-bottom: -1px;
       display: flex;
@@ -210,7 +240,8 @@
       flex-wrap: wrap;
     }
 
-    .startbar .count { color: var(--dim); font-size: 0.82rem; flex: 1; min-width: 150px; }
+    .startbar .count { color: var(--dim); font-size: 0.86rem; flex: 1; min-width: 150px; }
+    #view-setup .notice:last-of-type { margin-bottom: 4px; }
     .startbar .count b { color: var(--text); font-variant-numeric: tabular-nums; }
 
     /* ── Drill ────────────────────────────────────────── */
@@ -236,15 +267,22 @@
       border-left: 3px solid var(--tc, var(--accent));
       border-radius: 18px;
       padding: 26px 24px;
-      min-height: 260px;
+      min-height: clamp(200px, 34vh, 300px);
       display: flex;
       flex-direction: column;
       box-shadow: 0 22px 50px -28px rgba(0, 0, 0, .95);
+      -webkit-user-select: none;
+      user-select: none;
     }
 
+    /* In flip mode the whole card is the reveal target — the biggest one there is. */
+    .card.tappable { cursor: pointer; transition: border-color .15s; }
+    .card.tappable:active { border-color: var(--line-strong); }
+
     .card .tag {
-      font-size: 0.63rem;
-      letter-spacing: 0.15em;
+      font-family: var(--font-display);
+      font-size: 0.78rem;
+      letter-spacing: 0.19em;
       text-transform: uppercase;
       font-weight: 700;
       color: var(--tc, var(--accent));
@@ -262,7 +300,10 @@
       padding-left: 9px;
     }
 
-    .card .tag .boxlvl { margin-left: auto; color: var(--dimmer); letter-spacing: .08em; }
+    .card .tag .boxlvl {
+      margin-left: auto; color: var(--dimmer);
+      font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: .02em;
+    }
 
     .card .body { flex: 1; display: flex; flex-direction: column; justify-content: center; }
 
@@ -296,8 +337,8 @@
       border-bottom-width: 2px;
       border-radius: 5px;
       padding: 1px 6px;
-      font-size: 0.72rem;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.7rem;
+      font-family: var(--font-mono);
     }
 
     /* Symbol chips */
@@ -341,10 +382,10 @@
 
     .choice:hover:not(:disabled) { border-color: var(--line-strong); }
     .choice .key {
-      font-size: 0.7rem; font-weight: 700; color: var(--dimmer);
+      font-size: 0.74rem; font-weight: 700; color: var(--dimmer);
       border: 1px solid var(--line); border-radius: 5px;
-      padding: 0 6px; flex: none; margin-top: 2px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      padding: 1px 7px; flex: none; margin-top: 2px;
+      font-family: var(--font-mono);
     }
     .choice.right { border-color: var(--good); background: rgba(52,211,153,.13); }
     .choice.right .key { border-color: var(--good); color: var(--good); }
@@ -360,8 +401,14 @@
       background: var(--panel); border: 1px solid var(--line);
       border-radius: var(--radius); padding: 20px 22px; margin-bottom: 8px;
     }
-    .score .big { font-size: 2.6rem; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-    .score .lbl { font-size: 0.74rem; text-transform: uppercase; letter-spacing: .12em; color: var(--dimmer); font-weight: 700; }
+    .score .big {
+      font-family: var(--font-display); font-size: 3.1rem; font-weight: 800;
+      letter-spacing: 0; line-height: 1; font-variant-numeric: tabular-nums;
+    }
+    .score .lbl {
+      font-family: var(--font-display); font-size: 0.86rem; text-transform: uppercase;
+      letter-spacing: .16em; color: var(--dimmer); font-weight: 700; margin-top: 4px;
+    }
 
     .missed { display: grid; gap: 8px; }
     .missed .item {
@@ -383,12 +430,12 @@
       border-radius: 16px; padding: 22px; width: min(560px, 100%);
       max-height: 86vh; overflow: auto;
     }
-    .modal h3 { font-size: 1.05rem; margin-bottom: 4px; }
+    .modal h3 { font-family: var(--font-display); font-size: 1.4rem; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
     .modal .sub { color: var(--dim); font-size: 0.82rem; margin-bottom: 16px; }
     label.f { display: block; margin-bottom: 13px; }
-    label.f span { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--dimmer); font-weight: 700; margin-bottom: 5px; }
+    label.f span { display: block; font-family: var(--font-display); font-size: 0.82rem; text-transform: uppercase; letter-spacing: .14em; color: var(--dimmer); font-weight: 700; margin-bottom: 5px; }
     .modal textarea, .modal input, .modal select {
-      width: 100%; font: inherit; font-size: 0.9rem; color: var(--text);
+      width: 100%; font: inherit; font-size: 16px; color: var(--text);
       background: #070b14; border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px;
     }
     .modal textarea { min-height: 80px; resize: vertical; line-height: 1.5; }
@@ -405,16 +452,63 @@
       margin-top: 18px;
       display: flex; gap: 10px; align-items: flex-start;
     }
-    .notice button { color: #fde68a; text-decoration: underline; font-size: 0.8rem; margin-left: auto; flex: none; }
+    .notice button {
+      color: #fde68a; text-decoration: underline; font-size: 0.8rem;
+      margin-left: auto; flex: none; padding: 10px 4px; margin-top: -10px; margin-bottom: -10px;
+    }
 
     footer { margin-top: 34px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--dimmer); font-size: 0.76rem; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
-    footer button { color: var(--dim); text-decoration: underline; font-size: 0.76rem; }
+    footer button { color: var(--dim); text-decoration: underline; font-size: 0.8rem; padding: 11px 4px; margin: -11px 0; }
 
     .hide { display: none !important; }
 
-    @media (max-width: 560px) {
-      .card { padding: 20px 17px; min-height: 230px; }
-      header { padding: 20px 0 14px; }
+    @media (max-width: 640px) {
+      body { padding: 0 13px calc(30px + env(safe-area-inset-bottom)); }
+      header { padding: calc(16px + env(safe-area-inset-top)) 0 12px; }
+      .card { padding: 20px 17px; }
+
+      /* Drilling on a phone: drop the masthead and give the card the screen. */
+      body.drilling header { display: none; }
+      body.drilling .drillbar { padding-top: calc(14px + env(safe-area-inset-top)); }
+
+      .topics { grid-template-columns: 1fr; gap: 8px; }
+      .topic .blurb { margin-bottom: 7px; }
+
+      /* Filter labels sit above their chips instead of squeezing them. */
+      .frow { flex-direction: column; align-items: stretch; gap: 6px; }
+      .frow .flabel { min-width: 0; }
+
+      .brand .kicker { font-size: 0.72rem; letter-spacing: 0.16em; }
+
+      .grade .btn { min-height: 54px; font-size: 1.05rem; }
+      .choice { padding: 14px; min-height: 52px; font-size: 0.95rem; }
+      .rowbtns .btn { flex: 1; }
+      .startbar .count { order: -1; flex-basis: 100%; }
+      .startbar .btn { flex: 1; }
+      .score { gap: 18px 26px; padding: 17px 18px; }
+      .score .big { font-size: 2.4rem; }
+    }
+
+    /* Short viewports (a phone held sideways) need the height more than the masthead. */
+    @media (max-height: 520px) {
+      body.drilling header { display: none; }
+      body.drilling .drillbar { padding: calc(10px + env(safe-area-inset-top)) 0 8px; }
+      .card { min-height: 0; padding: 14px 18px; }
+      .card .tag { margin-bottom: 8px; }
+      .q { font-size: 1.05rem; }
+      .a { margin-top: 12px; padding-top: 11px; }
+      .hint { padding-top: 10px; }
+      .grade { margin-top: 10px; }
+      .grade .btn { min-height: 46px; padding: 10px; }
+      .choices { margin-top: 12px; gap: 6px; }
+      .choice { padding: 10px 13px; min-height: 0; }
+      .rowbtns { margin-top: 10px; }
+    }
+
+    @media (max-width: 380px) {
+      .brand h1 { font-size: 1.75rem; }
+      .grade { gap: 8px; }
+      .grade .btn { min-width: 0; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -545,7 +639,8 @@
           return '<span class="sym" style="--c:' + g[1] + '">' + g[0] + ' ' + g[2] + '</span>';
         })
         .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
-        .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+        .replace(/\n/g, '<br>');
     }
 
     /* Plain-text version, for multiple-choice options and the summary list. */
@@ -553,7 +648,8 @@
       return String(text)
         .replace(/\[\[(\w+)\]\]/g, (m, k) => (GLYPH[k.toLowerCase()] || [, , m])[2])
         .replace(/\*\*([^*]+)\*\*/g, '$1')
-        .replace(/\*([^*]+)\*/g, '$1');
+        .replace(/\*([^*]+)\*/g, '$1')
+        .replace(/\n/g, ' ');
     }
 
     /* ── Card library ─────────────────────────────────────────────── */
@@ -597,7 +693,7 @@
         const row = EOTE.skills.find((r) => r[0] === skill);
         add({
           id: 'call:' + i, topic: 'calls', sub: null, style: 'attribute',
-          front: scene + '<br>**Which skill do you ask for?**',
+          front: scene + '\n**Which skill do you ask for?**',
           back: skill + (row ? ' (' + row[1] + ')' : ''), note: note,
           key: skill, group: 'skill'
         });
@@ -806,15 +902,15 @@
     }
 
     function chipRow(label, items) {
-      const row = el('div');
-      row.style.cssText = 'display:flex;gap:9px;align-items:center;flex-wrap:wrap;width:100%';
+      const row = el('div', 'frow');
       if (label) {
-        const l = el('span');
-        l.style.cssText = 'font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(230,236,245,.35);font-weight:700;min-width:96px';
+        const l = el('span', 'flabel');
         l.textContent = label;
         row.appendChild(l);
       }
-      items.forEach((n) => row.appendChild(n));
+      const group = el('div', 'fchips');
+      items.forEach((n) => group.appendChild(n));
+      row.appendChild(group);
       return row;
     }
 
@@ -940,6 +1036,7 @@
 
     function show(which) {
       ['setup', 'drill', 'done'].forEach((v) => $('view-' + v).classList.toggle('hide', v !== which));
+      document.body.classList.toggle('drilling', which === 'drill');
       window.scrollTo(0, 0);
     }
 
@@ -1008,7 +1105,8 @@
     function drawFlip() {
       const ctl = $('card-controls');
       ctl.innerHTML = '';
-      $('card-hint').innerHTML = 'Answer out loud first. <kbd>Space</kbd> to reveal.';
+      $('card').classList.add('tappable');
+      $('card-hint').innerHTML = 'Answer out loud first, then tap the card. <kbd>Space</kbd> works too.';
       const row = el('div', 'grade');
       const b = el('button', 'btn primary');
       b.textContent = 'Reveal answer';
@@ -1018,8 +1116,10 @@
     }
 
     function reveal() {
+      if (state.revealed) return;
       const c = currentCard();
       state.revealed = true;
+      $('card').classList.remove('tappable');
       $('card-a').innerHTML =
         '<div class="a">' + render(c.back) +
         (c.note ? '<div class="note">' + render(c.note) + '</div>' : '') + '</div>';
@@ -1039,6 +1139,7 @@
     }
 
     function drawChoices(c) {
+      $('card').classList.remove('tappable');
       $('card-hint').innerHTML = 'Pick one — <kbd>1</kbd>–<kbd>4</kbd> work too.';
       const ctl = $('card-controls');
       ctl.innerHTML = '';
@@ -1254,6 +1355,8 @@
     }
 
     /* ── Wiring ───────────────────────────────────────────────────── */
+
+    $('card').onclick = () => { if (!state.mc && !state.revealed) reveal(); };
 
     $('btn-start').onclick = startDrill;
     $('btn-weak').onclick = () => { db.settings.weakFirst = !db.settings.weakFirst; save(); drawSetup(); };
