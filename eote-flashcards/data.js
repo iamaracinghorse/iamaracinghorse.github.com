@@ -353,6 +353,33 @@ EOTE.rules = [
   { t: 'obligation', q: 'What can a Destiny Point be spent on?',
     a: 'Upgrade one ability die of a check to [[proficiency]], or upgrade the difficulty of an opponent\'s check to [[challenge]] (once per check) · introduce a minor narrative fact ("of course this port has a spice dealer") · power certain talents and abilities.' },
 
+  /* ---- Spending results, in general ---- */
+  { t: 'spends', q: 'What do [[advantage]] and [[threat]] actually represent?',
+    a: 'Side effects, resolved **separately from whether the check passed**. [[advantage]] is something good that is not "you succeed"; [[threat]] is a cost or complication that is not "you fail".',
+    n: 'This is the engine of the whole system. If you only read success and failure, you are playing a worse game with prettier dice.' },
+  { t: 'spends', q: 'Who decides what [[advantage]] and [[threat]] mean?',
+    a: 'The **player** proposes what their [[advantage]] buys, with the GM signing off. The **GM** spends [[threat]] and [[despair]]. Let players pitch first — they invent better complications for themselves than you will.' },
+  { t: 'spends', q: 'When do results have to be spent?',
+    a: '**Immediately**, as the check resolves. They do not bank, carry to the next roll, or get saved for later. Unspent [[advantage]] is simply lost.',
+    n: 'So never let the table stall on it. Have a default ready — recover a strain, hand an ally a [[boost]] — and move.' },
+  { t: 'spends', q: 'What can spare [[advantage]] buy on a **non-combat** check?',
+    a: 'Recover 1 strain per [[advantage]] · Add [[boost]] to the next allied character\'s check · Notice a useful detail about the task or surroundings · Take an immediate free manoeuvre in structured time · Reduce the time the task takes.',
+    n: 'Two [[advantage]] is roughly "a real, concrete benefit". Three or more should visibly change the scene.' },
+  { t: 'spends', q: 'What can [[threat]] cost on a **non-combat** check?',
+    a: 'Suffer 1 strain per [[threat]] · Lose the benefit of a previously spent [[advantage]] · The task takes considerably longer · A tool, dose or piece of gear is used up or damaged · Somebody notices you doing it.' },
+  { t: 'spends', q: 'The check **failed** but generated 3 [[advantage]]. What now?',
+    a: 'Spend it normally. The attempt did not work, but something came of it: you learned where the real lock is, you are in a better position, an ally gets a [[boost]], you recover strain.',
+    n: 'Failure with [[advantage]] is the most useful roll in the game — the plan dies but the scene moves forward.' },
+  { t: 'spends', q: 'The check **succeeded** but generated 3 [[threat]]. What now?',
+    a: 'They get what they wanted, and it costs them. The rule of thumb: [[threat]] **complicates, never negates**. If your complication amounts to "actually it did not work", you have written a failure instead.' },
+  { t: 'spends', q: 'How should a [[triumph]] differ from just another [[success]]?',
+    a: 'Extra [[success]] measures **magnitude** — more damage, a better result. [[triumph]] is a **narrative gift**: the thing you did not ask for. The guard turns out to owe you a favour; the door you sliced also unlocks the cell block.',
+    n: 'Give the player the pitch. A [[triumph]] they invented is remembered; one you handed them is not.' },
+  { t: 'spends', q: 'How should a [[despair]] differ from just another [[failure]]?',
+    a: 'Extra [[failure]] means it went worse. [[despair]] means something **changes and stays changed** — gear breaks, a relationship turns, reinforcements arrive, the ship is now on a list. It should still be there two scenes later.' },
+  { t: 'spends', q: 'A GM habit worth drilling: what do you do the moment the dice land?',
+    a: 'Read them in this order: **net [[success]] or [[failure]]** — did it work? Then **net [[advantage]] or [[threat]]** — what else happened? Then **[[triumph]] or [[despair]]** — what changed for good? Narrate all three as one sentence, not three rulings.' },
+
   /* ---- Advancement ---- */
   { t: 'xp', q: 'What does it cost to buy a rank in a skill?',
     a: '5 × the **new** rank in XP for a career skill, and 5 more than that for a non-career skill.',
@@ -369,6 +396,89 @@ EOTE.rules = [
     a: 'Taking on additional starting Obligation grants extra starting XP or extra starting credits. More rope now, more trouble later.' }
 ];
 
+/* ── Spending results on a skill check ──────────────────────────────
+   Per-skill prompts for the question that actually stalls a table:
+   "it succeeded, but there are two Threat — now what?"
+
+   These are SUGGESTED reads, written to give a GM somewhere to jump
+   from. They are not a transcription of the core rulebook's own
+   per-skill lists. Where your book gives specific results for a skill,
+   trust it, and use Bulk add to load its wording in.
+
+   [skill, what spare Advantage could buy, what Threat could cost]     */
+
+EOTE.spends = [
+  ['Stealth',
+   'You learn the patrol pattern on the way past · You leave no trace, so the alarm comes late or never · You end up somewhere better than planned — at the console rather than across the room · A boost to the next character sneaking the same route.',
+   'You get through but leave something behind: a print, a jammed door, a guard found early · The window is shorter than you thought · You are in, but cut off from the rest of the party.'],
+  ['Perception',
+   'You spot a second thing beyond what you were looking for — the maker\'s mark, the fresh scuff, the other person watching the room.',
+   'You find it, but you took long enough to be noticed looking · You fixate on the wrong detail and miss what mattered.'],
+  ['Vigilance',
+   'You notice, and you know where it is coming from — a boost on Initiative or the first move.',
+   'You notice too late to warn anyone · You flinch, and now they know that you know.'],
+  ['Charm',
+   'They also volunteer a rumour, knock something off the price, or will vouch for you later.',
+   'They like you, but now they want something from you · They will remember your face · Someone who dislikes them saw you making friends.'],
+  ['Deception',
+   'They believe it and repeat it to someone else, spreading the lie for you.',
+   'They buy it now but will check the story later · Someone else in the room knows better and says nothing yet.'],
+  ['Coercion',
+   'They talk, and they stay frightened enough not to warn anybody.',
+   'They talk, and report you the moment you are gone · You go far enough that the rest of the room turns against you.'],
+  ['Negotiation',
+   'Better terms than asked: extra cargo, faster delivery, a contact thrown in.',
+   'The deal closes with a string attached · Word gets around what you were willing to pay.'],
+  ['Leadership',
+   'They follow the order and keep their heads — a boost on their next check.',
+   'They obey and resent it · One of them improvises and does rather more than you asked.'],
+  ['Skulduggery',
+   'It opens faster than expected · You spot the second lock, or the trap, before it matters.',
+   'It opens, but the pick snaps or stays behind · The tampering is obvious to the next person through.'],
+  ['Computers',
+   'You get the data and cover your tracks · You pull a bonus file worth having.',
+   'You are in, but you tripped a passive log · Something noticed and is now looking · You are on a clock you cannot see.'],
+  ['Mechanics',
+   'The repair also improves something — extra system strain recovered, or it holds better than it has any right to.',
+   'It works, but it is a field patch that will fail at the worst moment · It cost a part you needed for something else.'],
+  ['Medicine',
+   'Extra wounds or strain healed · You read something off the injury: what weapon, how long ago, how skilled.',
+   'They are up but hurting, with a lingering effect · You burned the last of the supplies doing it.'],
+  ['Astrogation',
+   'A shorter jump, less fuel burned, or a route nobody thinks to watch.',
+   'The route works but passes an Imperial checkpoint · It takes noticeably longer than you told everyone.'],
+  ['Piloting (Space)',
+   'You lose them and come out of it in a better firing position · Recover system strain.',
+   'You make it, but the ship is strained · You are now somewhere you did not want to be.'],
+  ['Piloting (Planetary)',
+   'You arrive early, or arrive unseen.',
+   'You arrive, but the speeder is smoking · You were clocked on the way in.'],
+  ['Gunnery',
+   'Extra damage, a Critical Injury, or you knock out one specific system.',
+   'The weapon overheats · Ammunition runs low · You hit something you would rather have left intact.'],
+  ['Athletics',
+   'You make it across and can help the next person over — a boost for them.',
+   'You make it, but you drop something on the way · You arrive winded, and take strain for it.'],
+  ['Resilience',
+   'You endure and find something useful doing it: water, shelter, a landmark.',
+   'You endure, but gear is ruined · You arrive too exhausted to be much use straight away.'],
+  ['Streetwise',
+   'Your contact is willing to make the introduction personally.',
+   'You get the name, but you have now been asked about — somebody knows you are looking.'],
+  ['Survival',
+   'You track them and read the trail: how many, how fresh, heading where.',
+   'You find the trail, and it is bait · Something larger has started following you.'],
+  ['Cool',
+   'You stay level and move first — a boost, or the better slot in the order.',
+   'You hold it together, but everyone can see what it cost you.'],
+  ['Discipline',
+   'You shrug it off and steady somebody else while you are at it.',
+   'You hold, but the strain lingers into the next scene.'],
+  ['Knowledge (any)',
+   'You recall one extra actionable detail: a name, a weakness, a debt somebody owes.',
+   'You have one specific detail wrong · Knowing it means somebody else knows that you know.']
+];
+
 /* ── Topics ──────────────────────────────────────────────────────── */
 
 EOTE.topics = [
@@ -382,7 +492,8 @@ EOTE.topics = [
   { id: 'gear',       label: 'Gear',                 blurb: 'Encumbrance, stimpacks, armour and weapon stat lines.', color: '#2dd4bf' },
   { id: 'vehicles',   label: 'Vehicles',             blurb: 'Hull trauma, silhouette, scale, handling, defence zones.', color: '#818cf8' },
   { id: 'obligation', label: 'Obligation & Destiny', blurb: 'The two table-level mechanics that shape a session.', color: '#fb7185' },
-  { id: 'xp',         label: 'Advancement',          blurb: 'What everything costs in experience points.', color: '#a3e635' }
+  { id: 'xp',         label: 'Advancement',          blurb: 'What everything costs in experience points.', color: '#a3e635' },
+  { id: 'spends',     label: 'Spending Results',     blurb: 'It succeeded, but there are two Threat — now what?', color: '#facc15' }
 ];
 
 if (typeof window !== 'undefined') window.EOTE = EOTE;

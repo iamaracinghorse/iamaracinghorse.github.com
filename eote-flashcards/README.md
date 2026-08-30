@@ -25,6 +25,20 @@ Around 380 cards generated from `data.js`, across eleven decks:
 | Vehicles | Hull trauma, silhouette, scale, handling, defence zones |
 | Obligation & Destiny | The two table-level mechanics that shape a session |
 | Advancement | What everything costs in XP |
+| Spending Results | Per-skill prompts: it succeeded, but there are two Threat — now what? |
+
+### A note on Spending Results
+
+This deck drills the question that actually stalls a table, per skill. The
+per-skill entries are **suggested reads written for this deck**, to give a GM
+somewhere to jump from — they are not a transcription of the core rulebook's
+own result lists. The general cards in the deck (what Advantage and Threat
+represent, who spends them, when, and the complicate-never-negate rule) are
+system rules.
+
+If you want your book's exact wording, **Bulk** takes one card per line as
+`Question :: Answer :: optional note` and drops them straight into whichever
+deck you pick.
 
 ## How it works
 

@@ -528,6 +528,7 @@
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn small ghost" id="btn-add">+ Card</button>
+        <button class="btn small ghost" id="btn-bulk">Bulk</button>
         <button class="btn small ghost" id="btn-data">Data</button>
       </div>
     </header>
@@ -764,6 +765,21 @@
           id: 'talent:' + s + ':rev', topic: 'talents', sub: tierLabel, style: 'reverse',
           front: 'Which talent does this? *' + plain(effect) + '*',
           back: name + ' — ' + tierLabel + ', ' + act
+        });
+      });
+
+      /* Spending results, per skill */
+      (EOTE.spends || []).forEach(([skill, adv, thr]) => {
+        const k = slug(skill);
+        add({
+          id: 'spend:' + k + ':adv', topic: 'spends', sub: 'Advantage', style: 'define',
+          front: 'A **' + skill + '** check succeeds with 2 spare [[advantage]]. What could you give them?',
+          back: adv, note: 'Suggestions, not the book\'s own list — spend it on something the player will remember.'
+        });
+        add({
+          id: 'spend:' + k + ':thr', topic: 'spends', sub: 'Threat', style: 'define',
+          front: 'A **' + skill + '** check succeeds, but with 2 [[threat]]. What does it cost them?',
+          back: thr, note: 'Suggestions, not the book\'s own list — complicate, never negate.'
         });
       });
 
@@ -1304,6 +1320,8 @@
         '<label class="f"><span>Question</span><textarea id="a-front"></textarea></label>' +
         '<label class="f"><span>Answer</span><textarea id="a-back"></textarea></label>' +
         '<label class="f"><span>Note (optional)</span><textarea id="a-note" style="min-height:56px"></textarea></label>' +
+        '<div style="font-size:.78rem;color:rgba(230,236,245,.35);margin-bottom:14px">' +
+        'Adding a lot at once? Use <b>Bulk</b> instead — one card per line.</div>' +
         '<div class="acts"><button class="btn ghost" id="a-cancel">Cancel</button>' +
         '<button class="btn primary" id="a-save">Add card</button></div>',
         (box) => {
@@ -1317,6 +1335,54 @@
               id: 'custom:' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
               topic: topic, sub: topic === 'custom' ? null : 'Custom',
               front: front, back: back, note: box.querySelector('#a-note').value.trim()
+            });
+            if (db.settings.topics.indexOf(topic) === -1) db.settings.topics.push(topic);
+            save(); refreshLibrary(); closeModal(); afterLibraryChange();
+          };
+        });
+    }
+
+    function bulkModal() {
+      const opts = topicList().map((t) => '<option value="' + t.id + '"' +
+        (t.id === 'spends' ? ' selected' : '') + '>' + esc(t.label) + '</option>').join('');
+      const sample =
+        'Stealth :: 1 Advantage — you learn the patrol pattern :: from the core rules, p.NNN\n' +
+        'Stealth :: 2 Threat — you leave a trace someone will find';
+      openModal('Bulk add cards',
+        'One card per line: <b>Question :: Answer</b>, with an optional <b>:: note</b> on the end. ' +
+        'Blank lines are skipped. This is the quick way to load the result lists straight out of your own rulebook.',
+        '<label class="f"><span>Deck</span><select id="b-topic">' + opts + '</select></label>' +
+        '<label class="f"><span>Cards</span><textarea id="b-text" spellcheck="false" ' +
+        'style="min-height:190px;font-family:var(--font-mono);font-size:13px" placeholder="' + esc(sample) + '"></textarea></label>' +
+        '<div style="font-size:.78rem;color:rgba(230,236,245,.35);margin-bottom:14px">' +
+        'Answers accept the same markup as any card: **bold**, *italics*, and tokens like [[advantage]] or [[despair]].</div>' +
+        '<div class="acts"><span class="left" id="b-count" style="color:rgba(230,236,245,.55);font-size:.82rem;align-self:center"></span>' +
+        '<button class="btn ghost" id="b-cancel">Cancel</button>' +
+        '<button class="btn primary" id="b-save">Add cards</button></div>',
+        (box) => {
+          const ta = box.querySelector('#b-text');
+          const count = box.querySelector('#b-count');
+          const parse = () => ta.value.split('\n')
+            .map((l) => l.trim())
+            .filter((l) => l && l.indexOf('::') !== -1)
+            .map((l) => l.split('::').map((x) => x.trim()))
+            .filter((parts) => parts[0] && parts[1]);
+          const update = () => {
+            const n = parse().length;
+            count.textContent = n ? n + ' card' + (n === 1 ? '' : 's') + ' ready' : '';
+          };
+          ta.oninput = update;
+          box.querySelector('#b-cancel').onclick = closeModal;
+          box.querySelector('#b-save').onclick = () => {
+            const rows = parse();
+            if (!rows.length) { count.textContent = 'Nothing to add — check the :: separators.'; return; }
+            const topic = box.querySelector('#b-topic').value;
+            rows.forEach((parts, i) => {
+              db.custom.push({
+                id: 'custom:' + Date.now().toString(36) + i.toString(36) + Math.random().toString(36).slice(2, 5),
+                topic: topic, sub: topic === 'custom' ? null : 'Custom',
+                front: parts[0], back: parts[1], note: parts[2] || ''
+              });
             });
             if (db.settings.topics.indexOf(topic) === -1) db.settings.topics.push(topic);
             save(); refreshLibrary(); closeModal(); afterLibraryChange();
@@ -1364,6 +1430,7 @@
     $('btn-skip').onclick = skip;
     $('btn-edit').onclick = () => editCard(currentCard());
     $('btn-add').onclick = addCard;
+    $('btn-bulk').onclick = bulkModal;
     $('btn-data').onclick = dataModal;
     $('btn-home').onclick = () => { run = null; show('setup'); drawSetup(); };
     $('btn-again').onclick = startDrill;
